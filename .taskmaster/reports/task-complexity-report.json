@@ -1,0 +1,133 @@
+{
+	"meta": {
+		"generatedAt": "2026-02-02T20:19:36.883Z",
+		"tasksAnalyzed": 15,
+		"totalTasks": 15,
+		"analysisCount": 15,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Setup Project Infrastructure and Database Schema",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) Docker Compose configuration with PostgreSQL/Redis, 2) Database schema design for all tables with constraints/indexes, 3) Alembic migration setup and initial migration, 4) Environment variable configuration and validation, 5) Infrastructure testing and connection verification.",
+			"reasoning": "Involves multiple technologies (Docker, PostgreSQL, Redis, Alembic) with complex schema design across 7 tables, relationships, constraints, and migrations. High setup coordination and testing requirements increase cognitive complexity and potential for integration issues."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Implement Telegram Bot Framework and Authentication",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Divide into: 1) Telegram bot setup with python-telegram-bot and basic handlers, 2) PIN authentication flow with bcrypt hashing, 3) Redis session management with expiration, 4) Account lockout mechanism and middleware integration.",
+			"reasoning": "Requires stateful conversation handling, security (bcrypt, lockout), Redis integration, and middleware. Moderate complexity from authentication flows and error states, but follows established library patterns."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Implement Card Management System",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Split into: 1) Multi-step wizard for /add_cartao with validation, 2) CRUD operations (/list, /edit, /delete) with CardService, 3) Validation logic and duplicate handling.",
+			"reasoning": "Conversation state management for wizard adds state complexity, but CRUD operations follow standard patterns. Validation rules are straightforward with moderate Telegram UI integration."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Setup Default Categories and Category Management",
+			"complexityScore": 4,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Break into: 1) Default category creation on user signup with essential classification, 2) Category CRUD commands and CategoryService with usage validation.",
+			"reasoning": "Standard CRUD with simple business rules and default data seeding. Low complexity as it builds on existing auth/card infrastructure with minimal state management."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Integrate Groq Whisper for Audio Transcription",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Divide into: 1) Audio file handling and validation (formats, size, duration), 2) Groq Whisper API integration with retry logic, 3) Fallback transcription mechanism, 4) File storage/cleanup and metrics logging.",
+			"reasoning": "External API integration with file processing, validation, retries, fallback, rate limiting, and cleanup. High complexity from multimedia handling, error states, and reliability requirements."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Implement Gemini Flash for Data Extraction and Categorization",
+			"complexityScore": 9,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: 1) LLMService setup with google-generativeai, 2) Prompt engineering for expense extraction (amounts, dates, categories), 3) Relative date/number parsing (dateutil, text-to-decimal), 4) Multi-expense detection and confidence scoring, 5) Structured output validation and error handling.",
+			"reasoning": "Advanced LLM prompt engineering, Portuguese NLP parsing (relative dates, 'trinta reais'), confidence scoring, and multi-item extraction. High cognitive complexity from unstructured text processing and edge cases."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Implement User Learning and Pattern Recognition",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Split into: 1) Description normalization (unidecode, lowercase), 2) LearningService with storage and threshold logic (>=3 confirmations), 3) Confidence calculation and pattern updating.",
+			"reasoning": "Involves text normalization, database pattern storage, statistical confidence, and threshold logic. Moderate complexity with some algorithmic elements but clear rules."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Create Interactive Confirmation Flow",
+			"complexityScore": 7,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Divide into: 1) Confirmation message generation with inline keyboards and confidence indicators, 2) Edit flows for each field (amount, category, etc.), 3) Timeout handling with Redis, 4) State management and cancellation logic.",
+			"reasoning": "Complex multi-step conversation flows, inline keyboard state management, timeouts, and field-specific editing. High state complexity typical of interactive Telegram bots."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Implement Expense and Entry Data Models",
+			"complexityScore": 7,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break into: 1) ExpenseService CRUD with validation, 2) Entry model and state machine (pending->paid/cancelled), 3) Installment vs single payment logic, 4) Soft delete and relationship constraints.",
+			"reasoning": "Core domain models with state machines, relationships (expenses-entries-cards), validation, and business logic separation. Moderate-high complexity from data modeling and integrity."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Implement Credit Card Due Date Calculation Logic",
+			"complexityScore": 8,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Split into: 1) Core due date algorithm (closing_day logic, month transitions), 2) Competence_month calculation for installments, 3) Edge case handling (month lengths, year boundaries).",
+			"reasoning": "Sophisticated date arithmetic with business rules, month/year transitions, and variable month lengths. High algorithmic complexity with many edge cases requiring robust testing."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Create Monthly Summary and Reporting System",
+			"complexityScore": 5,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Divide into: 1) ReportService aggregations (totals, percentages, comparisons), 2) /resumo command formatting and empty data handling.",
+			"reasoning": "Database aggregations and reporting follow standard SQL patterns. Moderate complexity from month-over-month comparisons and formatting."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Implement Expense Listing and Search",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break into: 1) Listing commands (/despesas) with month filtering and pagination, 2) Search functionality (description, category, amount), 3) Formatting and empty results handling.",
+			"reasoning": "Standard querying with pagination and search. Low-moderate complexity using SQL filters and Telegram pagination patterns."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Add Comprehensive Error Handling and Logging",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Split into: 1) ErrorHandler class with codes/templates (Portuguese), 2) Structured logging and retry mechanisms, 3) Health checks and API failure handling.",
+			"reasoning": "Cross-cutting concern requiring integration across codebase. Moderate complexity from standardization and i18n, but systematic implementation."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Implement API Usage Monitoring and Cost Tracking",
+			"complexityScore": 4,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Divide into: 1) MetricsService for tracking calls/tokens/costs, 2) Admin /metrics command and alerts.",
+			"reasoning": "Straightforward metrics collection and storage. Low complexity as it wraps existing API calls with logging."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "Setup Production Deployment with Docker and ngrok",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: 1) Production Docker Compose config, 2) ngrok webhook setup and SSL, 3) Database backup/restore automation, 4) Monitoring, health checks, and deployment scripts.",
+			"reasoning": "Multiple production concerns (backups, monitoring, webhooks) with security considerations. Moderate complexity from ops coordination."
+		}
+	]
+}

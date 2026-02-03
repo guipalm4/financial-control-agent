@@ -1,0 +1,767 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Infrastructure and Database Schema",
+        "description": "Initialize the project with Docker Compose, PostgreSQL database, and core infrastructure components including database schema for users, cards, categories, expenses, and entries.",
+        "details": "Create Docker Compose setup with PostgreSQL, Redis for session management, and application container. Design and implement database schema with tables: users (id, telegram_id, pin_hash, created_at, updated_at, failed_attempts, locked_until), cards (id, user_id, name, last_digits, closing_day, due_day, is_active, created_at), categories (id, user_id, name, is_default, created_at), expenses (id, user_id, description, total_amount, installments, payment_method, card_id, category_id, date, is_essential, created_at), entries (id, expense_id, installment_number, amount, due_date, competence_month, status, created_at), user_learning (id, user_id, normalized_description, category_id, confirmation_count, created_at), audio_logs (id, user_id, file_path, transcription, created_at, deleted_at). Use Alembic for migrations. Set up environment variables for API keys (Groq, Gemini).",
+        "testStrategy": "Verify Docker containers start successfully, database connections work, all tables are created with correct constraints and indexes. Test database migrations up and down. Validate environment variable loading.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Docker Compose configuration with PostgreSQL/Redis",
+            "description": "Create Docker Compose setup with PostgreSQL database, Redis for session management, and application container with proper networking and volume configuration.",
+            "dependencies": [],
+            "details": "Set up docker-compose.yml with PostgreSQL 15, Redis 7, and Python application services. Configure persistent volumes for database data, proper networking between containers, health checks, and restart policies. Include environment variable placeholders for database credentials and API keys.",
+            "status": "pending",
+            "testStrategy": "Verify all containers start successfully, database accepts connections, Redis is accessible, and volumes persist data across container restarts."
+          },
+          {
+            "id": 2,
+            "title": "Database schema design for all tables with constraints/indexes",
+            "description": "Design and implement complete database schema with all required tables, foreign key relationships, constraints, and performance indexes.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create SQL schema for users, cards, categories, expenses, entries, user_learning, and audio_logs tables. Implement proper foreign key constraints, unique indexes on telegram_id, composite indexes for performance queries, check constraints for data validation, and proper data types with appropriate lengths.",
+            "status": "pending",
+            "testStrategy": "Validate all tables are created with correct structure, foreign key constraints work properly, indexes improve query performance, and data validation constraints prevent invalid data insertion."
+          },
+          {
+            "id": 3,
+            "title": "Alembic migration setup and initial migration",
+            "description": "Configure Alembic for database migrations and create the initial migration script for the complete schema.",
+            "dependencies": [
+              2
+            ],
+            "details": "Install and configure Alembic with proper database connection settings. Create alembic.ini configuration file, set up migration environment, and generate initial migration script that creates all tables with constraints and indexes. Test migration rollback functionality.",
+            "status": "pending",
+            "testStrategy": "Test migration up and down operations work correctly, verify schema matches expected structure after migration, and validate rollback restores previous state properly."
+          },
+          {
+            "id": 4,
+            "title": "Environment variable configuration and validation",
+            "description": "Set up environment variable management for API keys, database credentials, and application configuration with proper validation.",
+            "dependencies": [],
+            "details": "Create .env.example template with all required variables including DATABASE_URL, REDIS_URL, GROQ_API_KEY, GEMINI_API_KEY, TELEGRAM_BOT_TOKEN. Implement environment variable validation on application startup with clear error messages for missing or invalid values.",
+            "status": "pending",
+            "testStrategy": "Verify application fails gracefully with clear error messages when required environment variables are missing, and successfully loads when all variables are properly configured."
+          },
+          {
+            "id": 5,
+            "title": "Infrastructure testing and connection verification",
+            "description": "Implement comprehensive testing suite to verify all infrastructure components work together correctly.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Create integration tests that verify Docker containers communicate properly, database connections work from application container, Redis session storage functions correctly, migrations can be applied successfully, and all environment variables are loaded and validated properly.",
+            "status": "pending",
+            "testStrategy": "Run complete infrastructure test suite that validates container orchestration, database connectivity, Redis functionality, migration system, and environment configuration work together as expected."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement Telegram Bot Framework and Authentication",
+        "description": "Set up Telegram bot using python-telegram-bot library with PIN-based authentication system including session management and account lockout protection.",
+        "details": "Install python-telegram-bot>=20.0. Create TelegramBot class with handlers for /start command. Implement PIN authentication with bcrypt hashing (cost=12). Create session management using Redis with 24h expiration. Implement account lockout after 3 failed attempts for 15 minutes. Create middleware for authentication checking. Handle PIN creation flow with confirmation step. Validate PIN format (4-6 digits only). Store user sessions with telegram_id as key.",
+        "testStrategy": "Test /start command triggers PIN creation. Verify PIN hashing with bcrypt. Test session creation and expiration. Validate account lockout after 3 failed attempts. Test PIN format validation rejects non-numeric input.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up Telegram Bot Framework with Basic Handlers",
+            "description": "Install python-telegram-bot library and create basic bot structure with command handlers",
+            "dependencies": [],
+            "details": "Install python-telegram-bot>=20.0 library. Create TelegramBot class with proper initialization using bot token. Implement basic command handlers starting with /start command. Set up application structure with proper error handling and logging. Configure bot to handle updates and messages appropriately.",
+            "status": "pending",
+            "testStrategy": "Test bot initialization with valid token. Verify /start command responds correctly. Test error handling for invalid commands. Validate bot can receive and process messages."
+          },
+          {
+            "id": 2,
+            "title": "Implement PIN Authentication Flow with Bcrypt Hashing",
+            "description": "Create secure PIN-based authentication system with proper hashing and validation",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement PIN creation flow with confirmation step. Add PIN format validation (4-6 digits only). Use bcrypt hashing with cost factor 12 for secure PIN storage. Create conversation handlers for PIN setup and authentication. Handle PIN verification process with proper error messages and retry logic.",
+            "status": "pending",
+            "testStrategy": "Test PIN creation flow requires confirmation. Verify PIN format validation rejects non-numeric input. Test bcrypt hashing stores PINs securely. Validate PIN verification works correctly."
+          },
+          {
+            "id": 3,
+            "title": "Implement Redis Session Management with Expiration",
+            "description": "Set up Redis-based session management system with automatic expiration",
+            "dependencies": [
+              2
+            ],
+            "details": "Configure Redis connection for session storage. Implement session creation using telegram_id as key. Set 24-hour expiration for all sessions. Create session validation middleware to check authentication status. Handle session cleanup and renewal logic. Store session data with user information and authentication status.",
+            "status": "pending",
+            "testStrategy": "Test session creation stores data in Redis with correct expiration. Verify sessions expire after 24 hours. Test session validation middleware blocks unauthenticated users. Validate session renewal works properly."
+          },
+          {
+            "id": 4,
+            "title": "Implement Account Lockout Mechanism and Middleware Integration",
+            "description": "Create account lockout protection after failed authentication attempts with middleware integration",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement account lockout after 3 failed PIN attempts for 15 minutes. Create lockout tracking using Redis with automatic expiration. Integrate authentication middleware to check lockout status before allowing PIN attempts. Handle lockout notifications and remaining time display. Reset failed attempt counter on successful authentication.",
+            "status": "pending",
+            "testStrategy": "Test account lockout triggers after 3 failed attempts. Verify lockout lasts exactly 15 minutes. Test middleware blocks attempts during lockout period. Validate failed attempt counter resets on success."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement Card Management System",
+        "description": "Create CRUD operations for credit cards with validation and onboarding wizard for new users.",
+        "details": "Implement /add_cartao command with step-by-step wizard: collect card name, last 4 digits (numeric validation), closing day (1-31), due day (1-31). Create /list_cartoes to show all active cards with formatting. Implement /edit_cartao and /delete_cartao (soft delete). Add validation: closing_day and due_day must be 1-31, last_digits must be exactly 4 numeric characters, card names must be unique per user. Create CardService class with methods: create_card(), get_user_cards(), update_card(), delete_card(). Handle duplicate card name errors.",
+        "testStrategy": "Test card creation with valid data succeeds. Verify validation rejects invalid closing/due days and non-numeric digits. Test duplicate name rejection. Verify soft delete functionality. Test card listing shows correct formatting.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Multi-step Wizard for /add_cartao Command",
+            "description": "Create a conversational wizard that guides users through adding a new credit card with step-by-step data collection and validation.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement conversation state management for /add_cartao command using Telegram's ConversationHandler. Create wizard steps: collect card name, validate and collect last 4 digits (must be exactly 4 numeric characters), collect closing day (1-31 validation), collect due day (1-31 validation). Add confirmation step showing all entered data before saving. Handle user cancellation at any step. Implement state transitions and error handling for invalid inputs with clear user feedback.",
+            "status": "pending",
+            "testStrategy": "Test wizard flow completion with valid data. Verify validation rejects invalid inputs at each step. Test cancellation functionality. Verify state management handles user interruptions correctly."
+          },
+          {
+            "id": 2,
+            "title": "Implement CRUD Operations and CardService Class",
+            "description": "Create CardService class with complete CRUD operations and implement /list_cartoes, /edit_cartao, and /delete_cartao commands.",
+            "dependencies": [],
+            "details": "Create CardService class with methods: create_card(), get_user_cards(), update_card(), delete_card(). Implement /list_cartoes command with formatted display showing card name, last 4 digits, closing day, and due day. Create /edit_cartao command allowing users to modify existing cards. Implement /delete_cartao with soft delete functionality (mark as inactive rather than physical deletion). Add proper error handling and user feedback for all operations.",
+            "status": "pending",
+            "testStrategy": "Test card creation, listing, editing, and soft deletion. Verify formatted display shows correct information. Test error handling for non-existent cards. Validate soft delete preserves data integrity."
+          },
+          {
+            "id": 3,
+            "title": "Implement Validation Logic and Duplicate Handling",
+            "description": "Create comprehensive validation system for card data and implement duplicate name detection with proper error handling.",
+            "dependencies": [],
+            "details": "Implement validation functions: validate_closing_day() and validate_due_day() (must be 1-31), validate_last_digits() (exactly 4 numeric characters), validate_unique_card_name() per user. Create custom exception classes for validation errors. Implement duplicate card name detection with clear error messages. Add input sanitization and normalization. Integrate validation into both wizard flow and edit operations with user-friendly error messages.",
+            "status": "pending",
+            "testStrategy": "Test validation rejects invalid closing/due days outside 1-31 range. Verify last digits validation accepts only 4 numeric characters. Test duplicate name detection prevents creation of cards with same name per user. Validate error messages are clear and actionable."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Setup Default Categories and Category Management",
+        "description": "Create default expense categories and implement category CRUD operations with essential/non-essential classification.",
+        "details": "Create default categories on user creation: Alimentação (essential), Transporte (mixed), Saúde (essential), Educação (essential), Lazer (non-essential), Compras (mixed), Serviços (mixed), Outros (mixed). Implement /add_categoria, /list_categorias, /delete_categoria commands. Create CategoryService with methods for category management. Add is_essential field logic based on category and description context. Store category learning patterns for future suggestions.",
+        "testStrategy": "Verify default categories are created for new users. Test category CRUD operations work correctly. Validate category deletion prevents deletion if used in expenses. Test essential/non-essential classification logic.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Default category creation on user signup with essential classification",
+            "description": "Create default expense categories when a new user signs up, with proper essential/non-essential classification for each category.",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement automatic creation of 8 default categories on user registration: Alimentação (essential), Transporte (mixed), Saúde (essential), Educação (essential), Lazer (non-essential), Compras (mixed), Serviços (mixed), Outros (mixed). Add database migration for categories table with fields: id, user_id, name, classification (essential/mixed/non-essential), created_at. Create CategoryService.create_default_categories() method that runs during user onboarding. Implement classification logic that considers both category type and expense description context for mixed categories.",
+            "status": "pending",
+            "testStrategy": "Verify default categories are automatically created for new users during signup. Test that all 8 categories are created with correct classifications. Validate that existing users don't get duplicate categories. Test classification logic for mixed categories based on expense descriptions."
+          },
+          {
+            "id": 2,
+            "title": "Category CRUD commands and CategoryService with usage validation",
+            "description": "Implement complete category management system with CRUD operations and validation to prevent deletion of categories in use.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create CategoryService class with methods: add_category(), list_categories(), delete_category(), update_category(). Implement Telegram commands: /add_categoria (with name and classification input), /list_categorias (formatted display with emojis), /delete_categoria (with usage validation). Add validation to prevent deletion of categories that have associated expenses. Implement category learning patterns storage for future expense suggestions. Add category usage statistics tracking. Handle category name uniqueness per user and proper error messaging.",
+            "status": "pending",
+            "testStrategy": "Test category CRUD operations work correctly through Telegram commands. Verify category deletion is blocked when category has associated expenses. Test category listing shows proper formatting with classifications. Validate category name uniqueness enforcement. Test learning pattern storage functionality."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Integrate Groq Whisper for Audio Transcription",
+        "description": "Implement audio transcription using Groq Whisper API with fallback mechanism and audio file management.",
+        "details": "Install groq library. Create AudioService class with transcribe_audio() method. Handle audio file validation: supported formats (ogg, mp3, wav, m4a), max duration 60 seconds, max file size 25MB. Implement Groq Whisper API integration with error handling and retry logic. Create fallback transcription mechanism (can use OpenAI Whisper as backup). Store audio files temporarily and delete after 7 days. Handle rate limiting and API errors gracefully. Log transcription accuracy metrics.",
+        "testStrategy": "Test audio transcription with various formats and languages (PT-BR focus). Verify file validation rejects oversized/invalid files. Test fallback mechanism when Groq API fails. Validate audio cleanup after 7 days.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Audio File Handling and Validation",
+            "description": "Implement comprehensive audio file validation including format checking, size limits, and duration constraints.",
+            "dependencies": [],
+            "details": "Create audio file validation methods to check supported formats (ogg, mp3, wav, m4a), enforce maximum file size of 25MB, and validate audio duration does not exceed 60 seconds. Implement file type detection using magic numbers or metadata parsing. Add proper error messages for validation failures.",
+            "status": "pending",
+            "testStrategy": "Test validation with various audio formats and sizes. Verify rejection of unsupported formats, oversized files, and long duration audio. Test edge cases like corrupted files."
+          },
+          {
+            "id": 2,
+            "title": "Groq Whisper API Integration with Retry Logic",
+            "description": "Implement Groq Whisper API integration with robust error handling and retry mechanisms.",
+            "dependencies": [
+              1
+            ],
+            "details": "Install groq library and create AudioService class with transcribe_audio() method. Implement API calls to Groq Whisper with exponential backoff retry logic. Handle rate limiting, network errors, and API failures gracefully. Add proper logging for API interactions and error states.",
+            "status": "pending",
+            "testStrategy": "Test API integration with valid audio files. Verify retry logic handles temporary failures. Test rate limiting scenarios and error response handling."
+          },
+          {
+            "id": 3,
+            "title": "Fallback Transcription Mechanism",
+            "description": "Create fallback system using OpenAI Whisper when Groq API is unavailable or fails.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement fallback transcription using OpenAI Whisper API as backup when Groq fails. Create decision logic to determine when to use fallback. Ensure seamless transition between primary and fallback services. Maintain consistent response format regardless of which service is used.",
+            "status": "pending",
+            "testStrategy": "Test fallback activation when Groq API fails. Verify consistent transcription quality between services. Test scenarios where both services might fail."
+          },
+          {
+            "id": 4,
+            "title": "File Storage Management and Metrics Logging",
+            "description": "Implement temporary file storage with automatic cleanup and transcription accuracy metrics tracking.",
+            "dependencies": [
+              3
+            ],
+            "details": "Create temporary file storage system with 7-day retention policy. Implement automated cleanup job to delete old audio files. Add metrics logging for transcription accuracy, API response times, and success rates. Create monitoring dashboard for transcription performance tracking.",
+            "status": "pending",
+            "testStrategy": "Test file storage and cleanup after 7 days. Verify metrics collection for accuracy and performance. Test cleanup job execution and file deletion."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement Gemini Flash for Data Extraction and Categorization",
+        "description": "Create intelligent data extraction from transcribed text using Gemini Flash to identify expenses, amounts, dates, and categories.",
+        "details": "Install google-generativeai library. Create LLMService class with extract_expense_data() method. Design prompt engineering for Gemini Flash to extract: description, amount (convert text to decimal), date (handle relative dates like 'ontem', 'sábado passado'), category suggestion, confidence scores, is_essential classification. Handle multiple expenses in single audio. Implement date parsing for relative terms using dateutil. Return structured data with confidence scores for each field. Handle cases where no expense is detected.",
+        "testStrategy": "Test extraction with various Portuguese expense descriptions. Verify amount parsing from text ('trinta reais' -> 30.00). Test relative date parsing ('ontem', 'semana passada'). Validate confidence scoring. Test multiple expense detection in single audio.",
+        "priority": "high",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Setup LLMService with Google Generative AI Integration",
+            "description": "Install google-generativeai library and create LLMService class with Gemini Flash configuration",
+            "dependencies": [],
+            "details": "Install google-generativeai library via pip. Create LLMService class with initialization method that configures Gemini Flash API key and model settings. Implement basic connection testing and error handling for API authentication. Set up proper environment variable management for API credentials.",
+            "status": "pending",
+            "testStrategy": "Test API connection with valid credentials. Verify error handling for invalid API keys. Test environment variable loading."
+          },
+          {
+            "id": 2,
+            "title": "Design Prompt Engineering for Expense Data Extraction",
+            "description": "Create sophisticated prompts for Gemini Flash to extract expense information from Portuguese transcribed text",
+            "dependencies": [
+              1
+            ],
+            "details": "Design comprehensive prompts that instruct Gemini Flash to extract: expense description, amount (handling Portuguese text like 'trinta reais'), date information, category suggestions, and is_essential classification. Include examples in prompts for better accuracy. Handle edge cases like unclear amounts or missing information. Structure prompts to return JSON format with confidence scores.",
+            "status": "pending",
+            "testStrategy": "Test prompt with various Portuguese expense descriptions. Verify extraction accuracy for different amount formats. Test category suggestion quality."
+          },
+          {
+            "id": 3,
+            "title": "Implement Relative Date and Number Parsing",
+            "description": "Create parsing logic for Portuguese relative dates and text-to-decimal conversion using dateutil",
+            "dependencies": [
+              1
+            ],
+            "details": "Install and configure dateutil library for date parsing. Implement Portuguese relative date parsing for terms like 'ontem', 'sábado passado', 'semana passada'. Create text-to-decimal conversion for Portuguese number words ('trinta reais' -> 30.00). Handle various date formats and edge cases. Implement fallback mechanisms for unparseable dates.",
+            "status": "pending",
+            "testStrategy": "Test relative date parsing with various Portuguese terms. Verify text-to-decimal conversion accuracy. Test edge cases and fallback handling."
+          },
+          {
+            "id": 4,
+            "title": "Implement Multi-Expense Detection and Confidence Scoring",
+            "description": "Create logic to detect multiple expenses in single audio transcription and assign confidence scores",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement extract_expense_data() method that can identify multiple expenses within a single transcribed text. Design confidence scoring algorithm based on data completeness, clarity of extracted information, and model certainty. Handle cases where expenses are mentioned together or separately. Implement logic to separate individual expense entries from combined descriptions.",
+            "status": "pending",
+            "testStrategy": "Test detection of multiple expenses in single audio. Verify confidence scoring accuracy. Test separation of combined expense descriptions."
+          },
+          {
+            "id": 5,
+            "title": "Implement Structured Output Validation and Error Handling",
+            "description": "Create comprehensive validation and error handling for extracted expense data with fallback mechanisms",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Implement validation for all extracted fields: amount must be positive decimal, date must be valid, category must be from predefined list. Create error handling for cases where no expense is detected or extraction fails. Implement fallback mechanisms for partial data extraction. Return structured data format with validation status and error messages. Handle API rate limits and timeout scenarios.",
+            "status": "pending",
+            "testStrategy": "Test validation with invalid data inputs. Verify error handling for no expense detection. Test fallback mechanisms and API error scenarios."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Implement User Learning and Pattern Recognition",
+        "description": "Create learning system that remembers user categorization patterns to reduce manual confirmations over time.",
+        "details": "Create LearningService class with methods: learn_categorization(), get_category_suggestion(), normalize_description(). Implement description normalization: lowercase, remove accents (unidecode), trim whitespace. Store confirmed categorizations in user_learning table with confirmation count. Only suggest category if confirmed >= 3 times for same normalized description. Calculate confidence based on historical confirmations. Update learning patterns when user confirms or corrects categories.",
+        "testStrategy": "Test description normalization handles accents and case. Verify learning only suggests after 3+ confirmations. Test confidence calculation based on historical data. Validate learning updates when user makes corrections.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Description Normalization Module",
+            "description": "Create text normalization functionality to standardize expense descriptions for pattern matching.",
+            "dependencies": [],
+            "details": "Implement normalize_description() method that converts text to lowercase, removes accents using unidecode library, and trims whitespace. This normalized text will be used as the key for pattern matching in the learning system.",
+            "status": "pending",
+            "testStrategy": "Test normalization handles various accents (á, é, ñ, ç), converts uppercase to lowercase, and removes leading/trailing whitespace. Verify identical results for equivalent descriptions with different formatting."
+          },
+          {
+            "id": 2,
+            "title": "Create LearningService with Storage and Threshold Logic",
+            "description": "Implement the core learning service that stores categorization patterns and applies confirmation threshold logic.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create LearningService class with learn_categorization() and get_category_suggestion() methods. Implement user_learning table storage with confirmation count tracking. Apply threshold logic to only suggest categories when confirmed >= 3 times for the same normalized description.",
+            "status": "pending",
+            "testStrategy": "Test learning storage increments confirmation count correctly. Verify category suggestions only appear after 3+ confirmations. Test that different normalized descriptions are stored separately."
+          },
+          {
+            "id": 3,
+            "title": "Implement Confidence Calculation and Pattern Updates",
+            "description": "Create confidence scoring system and pattern update mechanisms for user corrections and confirmations.",
+            "dependencies": [
+              2
+            ],
+            "details": "Calculate confidence scores based on historical confirmation ratios and frequency. Implement pattern updating logic that increases confidence when user confirms suggestions and adjusts patterns when user makes corrections. Handle both positive and negative feedback to improve future suggestions.",
+            "status": "pending",
+            "testStrategy": "Test confidence calculation reflects confirmation history accurately. Verify pattern updates when user confirms or corrects categories. Test that confidence scores influence suggestion reliability appropriately."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Create Interactive Confirmation Flow",
+        "description": "Implement user-friendly confirmation interface with inline keyboards for expense validation and editing.",
+        "details": "Create ConfirmationService with methods to generate confirmation messages and handle user responses. Design inline keyboard with buttons: ✅ Confirmar, ✏️ Editar, ❌ Cancelar. Show confidence indicators: ✅ for high confidence (>=0.9), ❓ for low confidence (<0.9). Implement editing flow for each field: amount, description, category, date, card, installments. Handle confirmation timeout (5 minutes). Store pending confirmations in Redis with expiration.",
+        "testStrategy": "Test confirmation message formatting with confidence indicators. Verify inline keyboard functionality. Test editing flow for all fields. Validate confirmation timeout handling. Test cancellation clears pending state.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Confirmation Message Generation with Inline Keyboards",
+            "description": "Implement confirmation message formatting with inline keyboards and confidence indicators for expense validation.",
+            "dependencies": [],
+            "details": "Create ConfirmationService class with generate_confirmation_message() method. Design inline keyboard with buttons: ✅ Confirmar, ✏️ Editar, ❌ Cancelar. Implement confidence indicator logic: show ✅ for high confidence (>=0.9), ❓ for low confidence (<0.9). Format expense details clearly with amount, description, category, date, card, and installments. Handle keyboard callback data structure for routing user responses.",
+            "status": "pending",
+            "testStrategy": "Test confirmation message formatting with various expense data. Verify inline keyboard button generation and callback data. Test confidence indicator display logic with different confidence scores. Validate message formatting with all expense fields."
+          },
+          {
+            "id": 2,
+            "title": "Implement Field-Specific Edit Flows",
+            "description": "Create interactive editing flows for each expense field with validation and user-friendly prompts.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement edit handlers for each field: amount (numeric validation), description (text input), category (selection from predefined list), date (date format validation), card (selection from user cards), installments (numeric validation). Create conversation states for each edit flow. Implement field-specific validation and error handling. Provide clear prompts and examples for each field type. Handle user cancellation during editing.",
+            "status": "pending",
+            "testStrategy": "Test editing flow for each field type with valid and invalid inputs. Verify field validation logic and error messages. Test conversation state management during editing. Validate cancellation handling returns to confirmation state."
+          },
+          {
+            "id": 3,
+            "title": "Implement Timeout Handling with Redis Storage",
+            "description": "Create timeout mechanism for pending confirmations using Redis with automatic cleanup and user notifications.",
+            "dependencies": [
+              1
+            ],
+            "details": "Store pending confirmations in Redis with 5-minute expiration using confirmation_id as key. Implement timeout handler that automatically cancels expired confirmations. Create cleanup job to remove expired confirmation data. Send timeout notification to users when confirmation expires. Implement Redis key structure: 'confirmation:{user_id}:{confirmation_id}' with expense data and timestamp. Handle Redis connection errors gracefully.",
+            "status": "pending",
+            "testStrategy": "Test confirmation storage in Redis with proper expiration. Verify timeout handler cancels expired confirmations. Test cleanup job removes stale data. Validate timeout notifications are sent to users. Test Redis connection error handling."
+          },
+          {
+            "id": 4,
+            "title": "Implement State Management and Cancellation Logic",
+            "description": "Create comprehensive state management system for confirmation flows with proper cancellation and cleanup mechanisms.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Implement ConversationState enum for tracking confirmation flow states (PENDING, EDITING, CONFIRMED, CANCELLED, EXPIRED). Create state transition logic with proper validation. Implement cancellation handler that cleans up Redis data and conversation state. Handle concurrent confirmation requests from same user. Implement state persistence across bot restarts. Create error recovery mechanisms for corrupted states. Ensure proper cleanup on confirmation completion.",
+            "status": "pending",
+            "testStrategy": "Test state transitions for all confirmation flow scenarios. Verify cancellation clears all pending data and states. Test concurrent confirmation handling. Validate state persistence across bot restarts. Test error recovery for corrupted conversation states."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Implement Expense and Entry Data Models",
+        "description": "Create the core expense tracking system with proper separation between expenses (records) and entries (installments/payments).",
+        "details": "Create ExpenseService class with methods: create_expense(), get_user_expenses(), update_expense(), delete_expense(). Implement Entry model for installment tracking with status state machine (pending -> paid/cancelled). Handle single payment vs installments logic. Store total_amount in expenses table, individual installment amounts in entries table. Implement soft delete for expenses. Add validation for payment methods (cash, debit, credit). Link expenses to cards when payment_method is credit.",
+        "testStrategy": "Test expense creation with single payment and installments. Verify entry state machine transitions. Test soft delete functionality. Validate payment method constraints. Test expense-card relationships.",
+        "priority": "high",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement ExpenseService CRUD Operations with Validation",
+            "description": "Create ExpenseService class with complete CRUD operations and comprehensive validation for expense management.",
+            "dependencies": [],
+            "details": "Implement ExpenseService class with methods: create_expense(), get_user_expenses(), update_expense(), delete_expense(). Add validation for payment methods (cash, debit, credit). Implement business logic to link expenses to cards when payment_method is credit. Store total_amount in expenses table. Handle user-specific expense operations with proper error handling and data validation.",
+            "status": "pending",
+            "testStrategy": "Test expense creation with all payment methods. Verify validation rejects invalid payment methods. Test expense-card linking for credit payments. Validate CRUD operations work correctly for user-specific data."
+          },
+          {
+            "id": 2,
+            "title": "Implement Entry Model with State Machine",
+            "description": "Create Entry model for installment tracking with proper state machine implementation for payment status transitions.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement Entry model with status state machine supporting transitions: pending -> paid/cancelled. Store individual installment amounts in entries table. Create state transition methods with proper validation to prevent invalid state changes. Implement entry creation, status updates, and querying methods. Ensure entries are properly linked to their parent expenses.",
+            "status": "pending",
+            "testStrategy": "Test entry state machine transitions from pending to paid/cancelled. Verify invalid state transitions are rejected. Test entry creation with correct installment amounts. Validate entry-expense relationships."
+          },
+          {
+            "id": 3,
+            "title": "Implement Single Payment vs Installments Logic",
+            "description": "Create business logic to handle both single payments and installment-based expenses with proper entry generation.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement logic to differentiate between single payments and installments. For single payments, create one entry with full amount and immediate paid status. For installments, create multiple entries with calculated amounts and pending status. Handle installment amount distribution (equal splits with remainder handling). Integrate with Entry model to generate appropriate entries based on payment type.",
+            "status": "pending",
+            "testStrategy": "Test single payment creates one entry with full amount. Verify installment logic creates correct number of entries. Test installment amount distribution handles remainders correctly. Validate entry status assignment based on payment type."
+          },
+          {
+            "id": 4,
+            "title": "Implement Soft Delete and Relationship Constraints",
+            "description": "Add soft delete functionality for expenses and implement proper relationship constraints between expenses, entries, and cards.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Implement soft delete for expenses using deleted_at timestamp field. Ensure soft deleted expenses are excluded from normal queries. Handle cascading soft delete for related entries when expense is deleted. Implement relationship constraints between expenses-entries-cards with proper foreign key handling. Add database indexes for performance on soft delete queries.",
+            "status": "pending",
+            "testStrategy": "Test soft delete excludes expenses from normal queries. Verify cascading delete affects related entries. Test relationship constraints prevent orphaned records. Validate soft delete can be reversed if needed."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Implement Credit Card Due Date Calculation Logic",
+        "description": "Create sophisticated logic to calculate correct due dates for credit card installments based on closing dates.",
+        "details": "Create CardCalculationService with calculate_due_date() method. Implement logic: if expense date <= closing_day, first installment due next month; if expense date > closing_day, first installment due month after next. Handle month/year transitions correctly. Calculate competence_month for each installment. Account for different month lengths (28, 29, 30, 31 days). Generate due dates for all installments when creating expense entries.",
+        "testStrategy": "Test due date calculation for expenses before and after closing date. Verify month/year transitions (December to January). Test with different closing/due day combinations. Validate competence_month assignment for each installment.",
+        "priority": "high",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Core Due Date Algorithm with Closing Day Logic",
+            "description": "Create the fundamental due date calculation algorithm that determines installment due dates based on expense date and card closing day.",
+            "dependencies": [],
+            "details": "Implement CardCalculationService class with calculate_due_date() method. Core logic: if expense_date <= closing_day, first installment due next month; if expense_date > closing_day, first installment due month after next. Handle month/year transitions correctly (December to January). Create helper methods for date arithmetic and month navigation.",
+            "status": "pending",
+            "testStrategy": "Test due date calculation for expenses before and after closing date. Verify month/year transitions work correctly. Test edge cases like expenses on closing day itself."
+          },
+          {
+            "id": 2,
+            "title": "Implement Competence Month Calculation for Installments",
+            "description": "Create logic to calculate the competence_month for each installment in a credit card expense sequence.",
+            "dependencies": [
+              1
+            ],
+            "details": "Extend CardCalculationService to calculate competence_month for each installment based on the due date calculation. Implement method to generate sequence of competence months for multi-installment expenses. Ensure competence_month aligns with business rules and due date logic from core algorithm.",
+            "status": "pending",
+            "testStrategy": "Validate competence_month assignment for each installment matches expected business logic. Test multi-installment expenses have correct competence_month sequence."
+          },
+          {
+            "id": 3,
+            "title": "Handle Edge Cases for Month Lengths and Year Boundaries",
+            "description": "Implement robust handling of variable month lengths and year boundary transitions in due date calculations.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Account for different month lengths (28, 29, 30, 31 days) in due date calculations. Handle leap year scenarios for February. Implement logic for cases where due day doesn't exist in target month (e.g., due day 31 in February). Create fallback mechanisms to adjust to last valid day of month when needed.",
+            "status": "pending",
+            "testStrategy": "Test with different closing/due day combinations across various months. Verify leap year handling for February dates. Test edge cases where due day exceeds days in target month."
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Create Monthly Summary and Reporting System",
+        "description": "Implement comprehensive monthly expense reports with category breakdowns and comparisons.",
+        "details": "Create ReportService class with generate_monthly_summary() method. Calculate totals by category, essential vs non-essential breakdown, percentage distributions. Compare with previous month data. Generate formatted text reports with emojis and clear structure. Implement /resumo command with optional month parameter. Handle cases with no data gracefully. Include statistics: total spent, average per day, top categories, biggest expenses.",
+        "testStrategy": "Test monthly summary generation with sample data. Verify category totals and percentages are correct. Test month-over-month comparison logic. Validate handling of months with no data. Test report formatting and readability.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement ReportService with Data Aggregation and Analysis",
+            "description": "Create ReportService class with comprehensive data aggregation methods for monthly expense analysis including category totals, percentages, and month-over-month comparisons.",
+            "dependencies": [
+              10
+            ],
+            "details": "Create ReportService class with generate_monthly_summary() method. Implement database queries to calculate totals by category, essential vs non-essential breakdown, percentage distributions. Add logic to compare with previous month data including growth/decline calculations. Calculate statistics: total spent, average per day, top categories by spending, biggest individual expenses. Handle edge cases like first month with no previous data to compare.",
+            "status": "pending",
+            "testStrategy": "Test monthly summary generation with sample data across multiple months. Verify category totals and percentages are mathematically correct. Test month-over-month comparison logic with various scenarios (growth, decline, first month). Validate statistical calculations for accuracy."
+          },
+          {
+            "id": 2,
+            "title": "Implement /resumo Command with Formatting and Error Handling",
+            "description": "Create the /resumo Telegram command with formatted report output, emoji integration, and graceful handling of empty data scenarios.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement /resumo command handler with optional month parameter parsing. Create formatted text report generation with emojis and clear structure for readability. Handle cases with no expense data gracefully by showing appropriate messages. Implement month parameter validation and default to current month. Format currency values, percentages, and statistics in user-friendly way. Add error handling for invalid month inputs and database connection issues.",
+            "status": "pending",
+            "testStrategy": "Test /resumo command with various month parameters including current month, previous months, and invalid inputs. Verify report formatting and readability with different data volumes. Test handling of months with no data shows appropriate messages. Validate emoji integration and text structure."
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Implement Expense Listing and Search",
+        "description": "Create functionality to list and search through user expenses with filtering options.",
+        "details": "Create ExpenseListService with methods: list_current_month(), list_by_month(), search_expenses(). Implement /despesas command with optional month parameter. Add pagination for large result sets. Format expense display with clear information: date, description, amount, category, card (if credit). Implement search by description, category, or amount range. Handle month parameter validation (YYYY-MM format).",
+        "testStrategy": "Test expense listing for current and specific months. Verify pagination works with large datasets. Test search functionality with various criteria. Validate month parameter format checking. Test empty result handling.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Expense Listing Commands with Month Filtering and Pagination",
+            "description": "Create the /despesas command with optional month parameter and pagination support for listing user expenses.",
+            "dependencies": [
+              10
+            ],
+            "details": "Create ExpenseListService with methods list_current_month() and list_by_month(). Implement /despesas command handler that accepts optional month parameter in YYYY-MM format. Add month parameter validation and error handling. Implement pagination using Telegram inline keyboards for large result sets. Handle navigation between pages with proper state management.",
+            "status": "pending",
+            "testStrategy": "Test /despesas command without parameters shows current month. Verify month parameter validation accepts YYYY-MM format and rejects invalid formats. Test pagination works correctly with large datasets and navigation buttons function properly."
+          },
+          {
+            "id": 2,
+            "title": "Implement Search Functionality for Expenses",
+            "description": "Create search capabilities allowing users to find expenses by description, category, or amount range.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add search_expenses() method to ExpenseListService. Implement search filters for description (partial text matching), category (exact match), and amount range (min/max values). Create search command handlers with parameter parsing. Support combined search criteria and SQL query building with proper WHERE clauses and parameter binding.",
+            "status": "pending",
+            "testStrategy": "Test search by description finds partial matches. Verify category search returns exact matches only. Test amount range search with min/max boundaries. Validate combined search criteria work correctly together."
+          },
+          {
+            "id": 3,
+            "title": "Implement Expense Display Formatting and Empty Results Handling",
+            "description": "Create consistent formatting for expense display and handle cases when no expenses are found.",
+            "dependencies": [
+              2
+            ],
+            "details": "Design expense display format showing date, description, amount, category, and card information (for credit expenses). Implement currency formatting and date localization. Create empty results messages with helpful suggestions. Add summary information like total amounts and expense counts. Handle different expense types (cash vs credit) with appropriate formatting.",
+            "status": "pending",
+            "testStrategy": "Test expense formatting displays all required fields correctly. Verify currency amounts show proper formatting. Test empty results show helpful messages. Validate different expense types display appropriate information."
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Add Comprehensive Error Handling and Logging",
+        "description": "Implement robust error handling, logging system, and user-friendly error messages with internationalization support.",
+        "details": "Create ErrorHandler class with standardized error codes and messages. Implement logging with structured format including user_id, action, timestamp, error details. Create error message templates in Portuguese with error codes. Handle API failures gracefully (Groq, Gemini timeouts). Implement retry mechanisms for transient failures. Log processing metrics for monitoring. Create health check endpoints for monitoring.",
+        "testStrategy": "Test error handling for all API failure scenarios. Verify error messages are user-friendly and in Portuguese. Test retry mechanisms work correctly. Validate logging captures all necessary information for debugging.",
+        "priority": "medium",
+        "dependencies": [
+          12
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create ErrorHandler Class with Portuguese Error Templates",
+            "description": "Implement ErrorHandler class with standardized error codes and Portuguese error message templates for internationalization support.",
+            "dependencies": [],
+            "details": "Create ErrorHandler class with methods: get_error_message(), format_error_response(), get_error_code(). Define standardized error codes (E001-E999) for different error types. Create Portuguese error message templates with placeholders for dynamic content. Implement error severity levels (INFO, WARNING, ERROR, CRITICAL). Store error templates in JSON/YAML configuration files for easy maintenance. Include context-aware error messages for better user experience.",
+            "status": "pending",
+            "testStrategy": "Test error code generation and message formatting. Verify Portuguese templates render correctly with dynamic content. Test error severity classification. Validate error message consistency across different scenarios."
+          },
+          {
+            "id": 2,
+            "title": "Implement Structured Logging and Retry Mechanisms",
+            "description": "Create comprehensive logging system with structured format and implement retry mechanisms for transient API failures.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement structured logging with JSON format including user_id, action, timestamp, error_details, request_id. Create LoggingService with methods: log_user_action(), log_api_call(), log_error(), log_metrics(). Implement retry mechanisms for Groq and Gemini API calls with exponential backoff. Add circuit breaker pattern for API failure handling. Configure different log levels (DEBUG, INFO, WARNING, ERROR). Implement log rotation and retention policies. Add correlation IDs for request tracking.",
+            "status": "pending",
+            "testStrategy": "Test structured logging captures all required fields. Verify retry mechanisms work with different failure scenarios. Test exponential backoff timing. Validate circuit breaker triggers correctly. Test log rotation and cleanup processes."
+          },
+          {
+            "id": 3,
+            "title": "Create Health Check Endpoints and API Failure Handling",
+            "description": "Implement health check endpoints for monitoring and graceful handling of API failures with fallback mechanisms.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create health check endpoints: /health, /health/detailed, /health/dependencies. Implement HealthCheckService with methods: check_database(), check_groq_api(), check_gemini_api(), get_system_metrics(). Add graceful degradation for API failures - fallback to basic categorization when AI services are unavailable. Implement timeout handling for external API calls. Create monitoring metrics for API response times and success rates. Add alerting thresholds for critical system components. Include dependency status in health responses.",
+            "status": "pending",
+            "testStrategy": "Test health check endpoints return correct status codes. Verify graceful degradation when APIs are unavailable. Test timeout handling for slow API responses. Validate monitoring metrics collection. Test alerting triggers for system failures."
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Implement API Usage Monitoring and Cost Tracking",
+        "description": "Create monitoring system to track API usage and costs for Groq and Gemini services.",
+        "details": "Create MetricsService class to track API calls, tokens used, and estimated costs. Store metrics in api_metrics table with fields: service_name, endpoint, tokens_used, cost_usd, timestamp. Implement cost calculation based on current API pricing. Create /metrics command for admin to view usage statistics. Set up alerts for high usage or costs. Track accuracy metrics for model performance monitoring.",
+        "testStrategy": "Test API usage tracking for all service calls. Verify cost calculations match current pricing. Test metrics storage and retrieval. Validate alert thresholds work correctly. Test admin metrics command functionality.",
+        "priority": "low",
+        "dependencies": [
+          13
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement MetricsService for API Usage Tracking",
+            "description": "Create MetricsService class to track API calls, tokens used, and estimated costs for Groq and Gemini services with database storage.",
+            "dependencies": [
+              13
+            ],
+            "details": "Create MetricsService class with methods: track_api_call(), calculate_cost(), get_usage_stats(). Implement database schema for api_metrics table with fields: service_name, endpoint, tokens_used, cost_usd, timestamp. Add cost calculation logic based on current API pricing for both Groq and Gemini. Integrate tracking into existing API service calls to automatically log usage metrics. Include accuracy metrics tracking for model performance monitoring.",
+            "status": "pending",
+            "testStrategy": "Test API usage tracking for all service calls. Verify cost calculations match current pricing models. Test metrics storage and retrieval from database. Validate tracking integration doesn't affect API performance."
+          },
+          {
+            "id": 2,
+            "title": "Create Admin Metrics Command and Usage Alerts",
+            "description": "Implement /metrics admin command for viewing usage statistics and set up automated alerts for high usage or costs.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create /metrics command accessible only to admin users showing usage statistics: total calls, tokens used, costs by service and time period. Implement alert system that monitors usage thresholds and sends notifications for high usage or costs. Create formatted display of metrics with charts or tables. Add filtering options by date range, service type, and endpoint. Set configurable thresholds for cost and usage alerts.",
+            "status": "pending",
+            "testStrategy": "Test admin metrics command shows correct usage data. Verify alert thresholds trigger notifications appropriately. Test access control restricts command to admin users only. Validate metrics formatting and filtering options work correctly."
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Setup Production Deployment with Docker and ngrok",
+        "description": "Configure production deployment using Docker Compose with ngrok for webhook connectivity and implement backup strategies.",
+        "details": "Create production Docker Compose configuration with proper environment variable management. Set up ngrok for webhook connectivity to Telegram. Implement database backup strategy with automated daily backups. Configure log rotation and monitoring. Set up health checks for all services. Create deployment scripts and documentation. Implement graceful shutdown handling. Configure SSL/TLS for secure connections.",
+        "testStrategy": "Test complete deployment process from scratch. Verify webhook connectivity through ngrok. Test database backup and restore procedures. Validate health checks work correctly. Test graceful shutdown and restart procedures.",
+        "priority": "medium",
+        "dependencies": [
+          14
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Production Docker Compose Configuration",
+            "description": "Set up production-ready Docker Compose configuration with proper environment variable management and service definitions.",
+            "dependencies": [],
+            "details": "Create docker-compose.prod.yml with optimized configurations for production. Set up environment variable management using .env files with secrets handling. Configure proper resource limits, restart policies, and network isolation. Include services for the main application, database, and any required dependencies. Implement multi-stage Docker builds for optimized image sizes.",
+            "status": "pending",
+            "testStrategy": "Test Docker Compose deployment from scratch on clean environment. Verify all services start correctly with proper environment variables. Test resource limits and restart policies work as expected."
+          },
+          {
+            "id": 2,
+            "title": "Configure ngrok Webhook Setup and SSL/TLS",
+            "description": "Set up ngrok for webhook connectivity to Telegram with proper SSL/TLS configuration for secure connections.",
+            "dependencies": [
+              1
+            ],
+            "details": "Install and configure ngrok for exposing local webhook endpoints to Telegram. Set up SSL/TLS certificates for secure webhook communication. Configure ngrok authentication and domain settings. Implement webhook URL registration with Telegram Bot API. Set up automatic ngrok tunnel restart and URL update mechanisms.",
+            "status": "pending",
+            "testStrategy": "Test webhook connectivity through ngrok tunnel. Verify SSL/TLS certificates work correctly. Test automatic tunnel recovery after disconnections. Validate Telegram webhook receives messages properly."
+          },
+          {
+            "id": 3,
+            "title": "Implement Database Backup and Restore Automation",
+            "description": "Create automated database backup strategy with daily backups and restore procedures for data protection.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement automated daily database backup scripts using pg_dump or similar tools. Set up backup rotation policy to maintain historical backups. Create restore procedures with validation steps. Configure backup storage location and retention policies. Implement backup verification and integrity checks. Set up notifications for backup success/failure.",
+            "status": "pending",
+            "testStrategy": "Test automated backup creation and scheduling. Verify backup integrity and restore procedures work correctly. Test backup rotation and cleanup processes. Validate notification system for backup status."
+          },
+          {
+            "id": 4,
+            "title": "Setup Monitoring, Health Checks, and Deployment Scripts",
+            "description": "Configure comprehensive monitoring, health checks for all services, and create deployment automation scripts.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Implement health check endpoints for all services with proper status reporting. Configure log rotation using logrotate or similar tools. Set up monitoring dashboards and alerting for system metrics. Create deployment scripts for automated production deployments. Implement graceful shutdown handling for all services. Create comprehensive deployment documentation and runbooks.",
+            "status": "pending",
+            "testStrategy": "Test health checks return correct status for all services. Verify log rotation works properly. Test graceful shutdown and restart procedures. Validate deployment scripts work end-to-end. Test monitoring alerts trigger correctly."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2026-02-02T20:18:17.563Z",
+      "updated": "2026-02-02T20:18:17.564Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

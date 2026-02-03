@@ -1,78 +1,200 @@
-# Tech Specs — Telegram Finance Bot
+# Tech Specs — Finance Bot Telegram
 
-> **Resumo executivo:** Bot Python com python-telegram-bot 22.x, Groq Whisper Large v3 Turbo (STT) + Gemini 2.0 Flash (LLM), 
-> SQLite + SQLAlchemy. Arquitetura em camadas (handlers → services → repositories). 
-> Validação com Pydantic. Deploy local via Docker ou direto.
+> **Resumo executivo:** Especificação técnica do bot Telegram para registro de despesas via áudio. Stack: Python 3.11+, FastAPI, SQLModel, PostgreSQL. Integrações: Groq Whisper (transcrição), Gemini Flash (NER). Arquitetura monolito modular com background tasks nativo.
+
+---
 
 ## 1. Arquitetura
 
-### Diagrama
+### Diagrama de Componentes
 
 ```mermaid
-graph TB
-    subgraph Telegram
-        USER[👤 Usuário]
-        TG_API[Telegram API]
+graph TD
+    subgraph "Telegram"
+        TG[Telegram Bot API]
     end
     
-    subgraph "Bot (Python)"
-        HANDLERS[Handlers]
-        SERVICES[Services]
-        REPOS[Repositories]
-        SCHEMAS[Pydantic Schemas]
+    subgraph "Local Docker"
+        API[FastAPI<br/>:8000]
+        BG[Background Tasks]
+        DB[(PostgreSQL<br/>:5432)]
     end
     
-    subgraph "APIs Externas"
-        GROQ[Groq API]
-        WHISPER[Whisper Large v3 Turbo]
-        GEMINI[Gemini 2.0 Flash]
+    subgraph "External APIs"
+        GROQ[Groq Whisper]
+        GEMINI[Gemini Flash 2.0]
     end
     
-    subgraph Data
-        SQLITE[(SQLite)]
-    end
-    
-    USER -->|áudio/texto| TG_API
-    TG_API -->|webhook/polling| HANDLERS
-    HANDLERS --> SERVICES
-    SERVICES --> SCHEMAS
-    SERVICES --> REPOS
-    SERVICES --> GROQ
-    GROQ --> WHISPER
-    SERVICES --> GEMINI
-    REPOS --> SQLITE
-    HANDLERS -->|resposta| TG_API
-    TG_API -->|mensagem| USER
+    TG -->|webhook| API
+    API --> BG
+    BG --> GROQ
+    BG --> GEMINI
+    API --> DB
+    BG --> DB
 ```
 
 ### Componentes
 
-| Componente | Responsabilidade | Tecnologia |
-|------------|------------------|------------|
-| Handlers | Receber mensagens, callbacks | python-telegram-bot 22.x |
-| Services | Lógica de negócio | Python 3.14 |
-| Repositories | Acesso a dados | SQLAlchemy 2.x |
-| Schemas | Validação de dados | Pydantic 2.x |
-| Groq Client | Chamadas STT (Whisper) | groq-sdk |
-| Gemini Client | Chamadas LLM (extração) | google-generativeai |
-| SQLite | Persistência | SQLite 3.51.x |
-| Scheduler | Alertas de vencimento | APScheduler |
+| Componente | Responsabilidade | Tecnologia | Versão |
+|------------|------------------|------------|--------|
+| API Server | Webhook Telegram, handlers | FastAPI | 0.109+ |
+| Bot Handler | Comandos e callbacks | python-telegram-bot | 21+ |
+| Background Tasks | Transcrição, categorização | FastAPI BackgroundTasks | Nativo |
+| Database | Persistência | PostgreSQL | 16+ |
+| ORM | Mapeamento objeto-relacional | SQLModel | 0.0.14+ |
+| Migrations | Versionamento de schema | Alembic | 1.13+ |
+| Transcription | Áudio → texto | Groq Whisper Large | API |
+| NER/Categorization | Extração de entidades | Gemini Flash 2.0 | API |
+
+---
 
 ## 2. Modelo de Dados
 
-### Entidade: Category
+### Diagrama ER
+
+```mermaid
+erDiagram
+    users ||--o{ cards : has
+    users ||--o{ expenses : has
+    users ||--o{ sessions : has
+    users ||--o{ categorization_history : has
+    expenses ||--o{ entries : has
+    expenses }o--|| categories : belongs
+    expenses }o--o| cards : uses
+    expenses }o--|| payment_methods : uses
+    
+    users {
+        uuid id PK
+        bigint telegram_id UK
+        varchar telegram_username
+        varchar pin_hash
+        smallint pin_attempts
+        timestamp locked_until
+        varchar email
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    cards {
+        uuid id PK
+        uuid user_id FK
+        varchar name
+        char last_digits
+        smallint closing_day
+        smallint due_day
+        boolean is_active
+        timestamp deleted_at
+        timestamp created_at
+    }
+    
+    categories {
+        uuid id PK
+        uuid user_id FK
+        varchar name
+        varchar icon
+        boolean is_default
+        timestamp created_at
+    }
+    
+    payment_methods {
+        uuid id PK
+        varchar name UK
+        boolean is_credit
+    }
+    
+    expenses {
+        uuid id PK
+        uuid user_id FK
+        varchar description
+        decimal total_amount
+        date purchase_date
+        uuid category_id FK
+        boolean is_essential
+        uuid payment_method_id FK
+        uuid card_id FK
+        smallint installments
+        varchar audio_path
+        text transcription
+        decimal confidence
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    entries {
+        uuid id PK
+        uuid expense_id FK
+        uuid user_id FK
+        decimal amount
+        smallint installment_number
+        date due_date
+        char competence_month
+        varchar status
+        timestamp paid_at
+        timestamp created_at
+    }
+    
+    sessions {
+        uuid id PK
+        uuid user_id FK
+        bigint telegram_chat_id
+        boolean is_authenticated
+        timestamp expires_at
+        timestamp created_at
+        timestamp last_activity_at
+    }
+    
+    categorization_history {
+        uuid id PK
+        uuid user_id FK
+        varchar normalized_description
+        uuid category_id FK
+        boolean is_essential
+        int confirmation_count
+        timestamp last_used_at
+    }
+```
+
+### Entidade: User
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "id": { "type": "integer" },
-    "name": { "type": "string", "maxLength": 50 },
-    "type": { "type": "string", "enum": ["ESSENCIAL", "NAO_ESSENCIAL"] },
-    "icon": { "type": "string", "maxLength": 10 }
+    "id": { "type": "string", "format": "uuid" },
+    "telegram_id": { 
+      "type": "integer",
+      "x-pii": true,
+      "description": "ID único do Telegram"
+    },
+    "telegram_username": {
+      "type": "string",
+      "maxLength": 255,
+      "x-pii": true
+    },
+    "pin_hash": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Hash bcrypt do PIN"
+    },
+    "pin_attempts": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0
+    },
+    "locked_until": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "x-pii": true,
+      "nullable": true
+    }
   },
-  "required": ["id", "name", "type", "icon"]
+  "required": ["id", "telegram_id", "pin_hash"]
 }
 ```
 
@@ -83,31 +205,40 @@ graph TB
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "id": { "type": "integer" },
-    "name": { 
-      "type": "string", 
+    "id": { "type": "string", "format": "uuid" },
+    "user_id": { "type": "string", "format": "uuid" },
+    "name": {
+      "type": "string",
       "minLength": 1,
-      "maxLength": 50
+      "maxLength": 100,
+      "x-normalize": ["trim"]
     },
-    "last_digits": { 
-      "type": "string", 
-      "maxLength": 4,
+    "last_digits": {
+      "type": "string",
+      "pattern": "^\\d{4}$",
+      "x-pii": true
+    },
+    "closing_day": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 31
+    },
+    "due_day": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 31
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time",
       "nullable": true
-    },
-    "due_day": { 
-      "type": "integer", 
-      "minimum": 1, 
-      "maximum": 31 
-    },
-    "closing_day": { 
-      "type": "integer", 
-      "minimum": 1, 
-      "maximum": 31 
-    },
-    "is_credit": { "type": "boolean" },
-    "created_at": { "type": "string", "format": "date-time" }
+    }
   },
-  "required": ["id", "name", "due_day", "closing_day", "is_credit"]
+  "required": ["id", "user_id", "name", "last_digits", "closing_day", "due_day"]
 }
 ```
 
@@ -118,798 +249,488 @@ graph TB
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "id": { "type": "integer" },
-    "amount": { 
-      "type": "number", 
-      "minimum": 0.01,
-      "x-pii": false
-    },
-    "item": {
+    "id": { "type": "string", "format": "uuid" },
+    "user_id": { "type": "string", "format": "uuid" },
+    "description": {
       "type": "string",
-      "maxLength": 100,
-      "nullable": true,
-      "description": "Nome do item específico (ex: cerveja, carne)"
+      "minLength": 1,
+      "maxLength": 255
     },
-    "description": { 
-      "type": "string", 
-      "maxLength": 500,
+    "total_amount": {
+      "type": "number",
+      "minimum": 0.01,
+      "x-pii": true
+    },
+    "purchase_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "category_id": { "type": "string", "format": "uuid" },
+    "is_essential": {
+      "type": "boolean",
+      "default": false
+    },
+    "payment_method_id": { "type": "string", "format": "uuid" },
+    "card_id": {
+      "type": "string",
+      "format": "uuid",
       "nullable": true
     },
-    "card_id": { 
-      "type": "integer", 
-      "nullable": true 
-    },
-    "category_id": { "type": "integer" },
-    "category_type_override": {
-      "type": "string",
-      "enum": ["ESSENCIAL", "NAO_ESSENCIAL"],
-      "nullable": true,
-      "description": "Sobrescreve o tipo da categoria baseado no item específico"
-    },
-    "payment_type": { 
-      "type": "string", 
-      "enum": ["PIX", "DEBITO", "CREDITO"] 
-    },
-    "installments": { 
-      "type": "integer", 
-      "minimum": 1, 
+    "installments": {
+      "type": "integer",
+      "minimum": 1,
       "maximum": 48,
       "default": 1
     },
-    "current_installment": { 
-      "type": "integer", 
-      "minimum": 1,
-      "default": 1
-    },
-    "expense_date": { "type": "string", "format": "date" },
-    "invoice_month": { 
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 12,
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
       "nullable": true
-    },
-    "invoice_year": { 
-      "type": "integer",
-      "nullable": true
-    },
-    "confirmed": { "type": "boolean", "default": false },
-    "created_at": { "type": "string", "format": "date-time" }
+    }
   },
-  "required": ["id", "amount", "category_id", "payment_type", "expense_date"]
+  "required": ["id", "user_id", "description", "total_amount", "purchase_date", "category_id", "payment_method_id"]
 }
 ```
 
-### Entidade: Invoice
+### Entidade: Entry
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "id": { "type": "integer" },
-    "card_id": { "type": "integer" },
-    "month": { "type": "integer", "minimum": 1, "maximum": 12 },
-    "year": { "type": "integer" },
-    "due_date": { "type": "string", "format": "date" },
-    "total": { "type": "number", "default": 0 },
-    "is_paid": { "type": "boolean", "default": false },
-    "paid_at": { "type": "string", "format": "date-time", "nullable": true }
+    "id": { "type": "string", "format": "uuid" },
+    "expense_id": { "type": "string", "format": "uuid" },
+    "user_id": { "type": "string", "format": "uuid" },
+    "amount": {
+      "type": "number",
+      "minimum": 0.01,
+      "x-pii": true
+    },
+    "installment_number": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "competence_month": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "paid", "cancelled"],
+      "default": "pending"
+    },
+    "paid_at": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    }
   },
-  "required": ["id", "card_id", "month", "year", "due_date"]
+  "required": ["id", "expense_id", "user_id", "amount", "installment_number", "due_date", "competence_month", "status"]
 }
 ```
 
-### Diagrama ER
+---
+
+## 3. Contrato de API (Comandos Telegram)
+
+### API-001: /start — Início e Onboarding
+
+- **FEAT:** FEAT-001, FEAT-002
+- **Trigger:** Comando `/start`
+- **Auth:** Nenhuma (cria sessão)
+
+#### Fluxo
+
+```
+1. Verificar se usuário existe
+2. Se NÃO existe → Criar usuário, solicitar PIN
+3. Se existe e sessão expirada → Solicitar PIN
+4. Se existe e sessão válida → Responder "Já autenticado"
+```
+
+#### Response (novo usuário)
+
+```
+👋 Bem-vindo ao Finance Bot!
+
+Vamos configurar sua conta. Primeiro, crie um PIN de 4-6 dígitos.
+
+Digite seu PIN:
+```
+
+#### Response (erro)
+
+```json
+{
+  "code": "AUTH.INVALID_PIN",
+  "message": "PIN deve ter 4-6 dígitos numéricos",
+  "severity": "WARNING",
+  "traceId": "uuid-v4"
+}
+```
+
+---
+
+### API-002: PIN Validation — Validar PIN
+
+- **FEAT:** FEAT-001
+- **Trigger:** Mensagem de texto quando aguardando PIN
+- **Auth:** Sessão pendente
+
+#### Validações
+
+| Campo | Tipo | Obrigatório | Limites | Normalização | Erro |
+|-------|------|-------------|---------|--------------|------|
+| pin | string | sim | 4-6 chars | trim | AUTH.INVALID_PIN |
+
+#### Response (bloqueio)
+
+```json
+{
+  "code": "AUTH.ACCOUNT_LOCKED",
+  "message": "Conta bloqueada. Tente novamente em 15 minutos.",
+  "severity": "ERROR",
+  "traceId": "uuid-v4"
+}
+```
+
+---
+
+### API-003: /add_cartao — Adicionar Cartão
+
+- **FEAT:** FEAT-002, FEAT-010
+- **Trigger:** Comando `/add_cartao`
+- **Auth:** Sessão autenticada
+
+#### Validações
+
+| Campo | Tipo | Obrigatório | Limites | Normalização | Erro |
+|-------|------|-------------|---------|--------------|------|
+| name | string | sim | 1-100 | trim | CARD.NAME_REQUIRED |
+| last_digits | string | sim | 4 chars | - | CARD.INVALID_DIGITS |
+| closing_day | int | sim | 1-31 | - | CARD.INVALID_CLOSING_DAY |
+| due_day | int | sim | 1-31 | - | CARD.INVALID_DUE_DAY |
+
+#### Response (sucesso)
+
+```
+✅ Cartão cadastrado!
+
+💳 Nubank (*1234)
+📅 Fechamento: dia 10
+📅 Vencimento: dia 18
+```
+
+#### Response (erro)
+
+```json
+{
+  "code": "CARD.VALIDATION_ERROR",
+  "message": "Dados inválidos",
+  "severity": "WARNING",
+  "details": [
+    { "field": "last_digits", "code": "INVALID_FORMAT", "message": "Digite 4 dígitos" }
+  ],
+  "traceId": "uuid-v4"
+}
+```
+
+---
+
+### API-004: Audio Handler — Processar Áudio
+
+- **FEAT:** FEAT-003, FEAT-004, FEAT-005, FEAT-006, FEAT-007
+- **Trigger:** Mensagem de áudio/voice
+- **Auth:** Sessão autenticada
+- **Async:** Sim (Background Task)
+
+#### Fluxo
 
 ```mermaid
-erDiagram
-    Category ||--o{ Expense : has
-    Card ||--o{ Expense : used_in
-    Card ||--o{ Invoice : has
+sequenceDiagram
+    participant U as Usuário
+    participant B as Bot
+    participant G as Groq
+    participant M as Gemini
+    participant DB as Database
     
-    Category {
-        int id PK
-        string name UK
-        enum type
-        string icon
-    }
-    
-    Card {
-        int id PK
-        string name UK
-        string last_digits
-        int due_day
-        int closing_day
-        bool is_credit
-        datetime created_at
-    }
-    
-    Expense {
-        int id PK
-        decimal amount
-        string item
-        string description
-        int card_id FK
-        int category_id FK
-        enum category_type_override
-        enum payment_type
-        int installments
-        int current_installment
-        date expense_date
-        int invoice_month
-        int invoice_year
-        bool confirmed
-        datetime created_at
-    }
-    
-    Invoice {
-        int id PK
-        int card_id FK
-        int month
-        int year
-        date due_date
-        decimal total
-        bool is_paid
-        datetime paid_at
-    }
+    U->>B: Áudio
+    B->>B: Salvar arquivo
+    B-->>U: "⏳ Processando..."
+    B->>G: Transcrever
+    G-->>B: Texto + confiança
+    B->>M: Extrair entidades
+    M-->>B: JSON estruturado
+    B->>DB: Buscar histórico
+    DB-->>B: Padrões aprendidos
+    B->>B: Calcular confiança final
+    B-->>U: Resumo + botões
 ```
 
-## 3. Serviços Internos
+#### Request (extração)
 
-### SVC-001: AudioService
+```json
+{
+  "audio_format": ".ogg | .mp3 | .m4a",
+  "max_duration_seconds": 60
+}
+```
 
-Responsável por transcrição de áudio via Groq Whisper.
+#### Response (extração)
 
-#### Método: `transcribe(audio_file: bytes) -> str`
+```json
+{
+  "confidence": 0.92,
+  "expenses": [
+    {
+      "description": "Uber",
+      "amount": 30.00,
+      "date": "2026-02-01",
+      "category_suggestion": "Transporte",
+      "is_essential": false,
+      "payment_method": "Débito",
+      "card_hint": null,
+      "installments": 1
+    }
+  ]
+}
+```
 
-| Parâmetro | Tipo | Descrição |
-|-----------|------|-----------|
-| audio_file | bytes | Arquivo de áudio (ogg/mp3) |
+#### Response (erro)
 
-| Retorno | Tipo | Descrição |
-|---------|------|-----------|
-| text | str | Texto transcrito |
-
-| Erro | Quando | Ação |
-|------|--------|------|
-| AudioTooLongError | > 60s | Retornar mensagem de erro |
-| TranscriptionError | API falhou | Log + retornar mensagem |
-
-**Chamada Groq Whisper:**
-```python
-from groq import Groq
-
-client = Groq(api_key=GROQ_API_KEY)
-
-transcription = client.audio.transcriptions.create(
-    file=("audio.ogg", audio_file),
-    model="whisper-large-v3-turbo",
-    language="pt",
-    response_format="text"
-)
+```json
+{
+  "code": "AUDIO.TRANSCRIPTION_FAILED",
+  "message": "Não consegui transcrever. Tente novamente.",
+  "severity": "ERROR",
+  "traceId": "uuid-v4"
+}
 ```
 
 ---
 
-### SVC-002: ExtractionService
+### API-005: Callback Confirm — Confirmar Despesa
 
-Responsável por extrair dados estruturados do texto via Gemini 2.0 Flash.
+- **FEAT:** FEAT-006, FEAT-008, FEAT-009
+- **Trigger:** Callback `confirm_expense:{id}`
+- **Auth:** Sessão autenticada
 
-#### Método: `extract(text: str) -> ExpenseData`
-
-| Parâmetro | Tipo | Descrição |
-|-----------|------|-----------|
-| text | str | Texto transcrito |
-
-| Retorno | Tipo | Descrição |
-|---------|------|-----------|
-| ExpenseData | Pydantic | Dados extraídos |
-
-**Schemas de saída:**
-```python
-from datetime import date
-from pydantic import BaseModel
-from typing import Literal
-
-class ExpenseItem(BaseModel):
-    amount: float | None
-    category: str
-    category_type: Literal["ESSENCIAL", "NAO_ESSENCIAL"]
-    item: str | None = None  # Nome do item específico (cerveja, carne, etc)
-    card: str | None = None
-    payment_type: Literal["PIX", "DEBITO", "CREDITO"] = "DEBITO"
-    installments: int = 1
-    expense_date: date
-    description: str | None = None
-
-class ExtractionResult(BaseModel):
-    """Pode ser um único item ou múltiplos"""
-    items: list[ExpenseItem]
-    
-    @classmethod
-    def from_llm_response(cls, data: dict, default_date: date) -> "ExtractionResult":
-        if "items" in data:
-            items = [ExpenseItem(**item, expense_date=item.get("expense_date", default_date)) for item in data["items"]]
-        else:
-            items = [ExpenseItem(**data, expense_date=data.get("expense_date", default_date))]
-        return cls(items=items)
-```
-
-**Prompt do LLM:**
-```python
-from datetime import date, timedelta
-
-EXTRACTION_PROMPT = """Você é um assistente de extração de dados financeiros pessoais.
-Data de hoje: {today}
-Dia da semana hoje: {weekday}
-
-Extraia do texto os dados de gastos. Se houver MÚLTIPLOS ITENS com valores separados, retorne um ARRAY.
-
-Para CADA gasto extraia:
-- amount: valor em reais (número decimal, null se não encontrado)
-- category: uma de [Mercado, Moradia, Contas, Transporte, Saúde, Alimentação, Lazer, Vestuário, Outros]
-- category_type: ESSENCIAL ou NAO_ESSENCIAL (baseado no ITEM específico)
-- item: nome do item comprado (se mencionado)
-- card: nome do cartão (null se não mencionado)
-- payment_type: PIX | DEBITO | CREDITO (inferir pelo contexto, default DEBITO)
-- installments: número de parcelas (1 se não mencionado)
-- expense_date: data no formato YYYY-MM-DD
-- description: descrição curta (max 50 chars)
-
-REGRAS DE CLASSIFICAÇÃO DE ITENS:
-✅ ESSENCIAL:
-- Alimentos básicos: carne, frango, peixe, ovos, arroz, feijão, macarrão, pão
-- Hortifruti: frutas, verduras, legumes
-- Laticínios: leite, queijo, manteiga, iogurte natural
-- Produtos de limpeza e higiene pessoal
-
-❌ NAO_ESSENCIAL:
-- Bebidas alcoólicas: cerveja, vinho, whisky, vodka, cachaça
-- Bebidas industrializadas: refrigerante, suco de caixa, energético
-- Doces e snacks: chocolate, sorvete, salgadinhos, biscoitos recheados
-
-REGRAS DE DATA:
-- "hoje" → {today}
-- "ontem" → {yesterday}
-- "anteontem" → {day_before_yesterday}
-- "segunda/terça/quarta/quinta/sexta/sábado/domingo" → último dia dessa semana
-- "semana passada" → {today} - 7 dias
-- "dia X" → dia X do mês atual (ou anterior se já passou)
-- Se NÃO mencionar data → usar {today}
-
-REGRAS DE PAGAMENTO:
-- "crédito", "parcelado", "X vezes" → CREDITO
-- "débito", "no débito" → DEBITO
-- "pix", "transferência" → PIX
-- Se não especificado → DEBITO
-
-Texto: "{text}"
-
-Se MÚLTIPLOS ITENS com valores diferentes, retorne: {{ "items": [...] }}
-Se ÚNICO gasto, retorne objeto diretamente.
-Responda APENAS com JSON válido."""
-
-def _get_weekday_name(self, day: int) -> str:
-    days = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
-    return days[day]
-
-def _calculate_dates(self) -> dict:
-    today = date.today()
-    return {
-        "today": today.isoformat(),
-        "yesterday": (today - timedelta(days=1)).isoformat(),
-        "day_before_yesterday": (today - timedelta(days=2)).isoformat(),
-        "weekday": self._get_weekday_name(today.weekday())
-    }
-
-def extract(self, text: str) -> ExtractionResult:
-    dates = self._calculate_dates()
-    
-    response = self.gemini_client.generate_content(
-        EXTRACTION_PROMPT.format(text=text, **dates),
-        generation_config={
-            "temperature": 0.1,
-            "max_output_tokens": 500,
-            "response_mime_type": "application/json"
-        }
-    )
-    
-    data = json.loads(response.text)
-    return ExtractionResult.from_llm_response(data, date.today())
-```
-
----
-
-### SVC-003: ExpenseService
-
-Lógica de negócio para gastos.
-
-#### Método: `create_pending(data: ExpenseData) -> Expense`
-
-Cria um gasto pendente (confirmed=false).
-
-#### Método: `confirm(expense_id: int) -> Expense`
-
-Confirma o gasto e calcula fatura se crédito.
-
-#### Método: `cancel(expense_id: int) -> None`
-
-Deleta o gasto pendente.
-
-#### Método: `update_field(expense_id: int, field: str, value: Any) -> Expense`
-
-Atualiza um campo específico do gasto pendente.
-
----
-
-### SVC-004: InvoiceService
-
-Lógica de cálculo de faturas e distribuição de parcelas.
-
-#### Método: `calculate_first_invoice(card: Card, expense_date: date) -> tuple[int, int]`
-
-Retorna (mês, ano) da PRIMEIRA fatura (parcela 1) baseado na data do gasto e fechamento do cartão.
+#### Algoritmo de Vencimento (RULE-004)
 
 ```python
-def calculate_first_invoice(self, card: Card, expense_date: date) -> tuple[int, int]:
+def calcular_vencimento(purchase_date: date, closing_day: int, due_day: int) -> date:
     """
-    Regras:
-    - Compra ATÉ o dia do fechamento (inclusive) → fatura ATUAL
-    - Compra APÓS o dia do fechamento → PRÓXIMA fatura
-    
-    Exemplo:
-    - Cartão fecha dia 20
-    - Compra dia 15 → fatura do mês atual
-    - Compra dia 20 → fatura do mês atual
-    - Compra dia 21 → fatura do próximo mês
+    Se compra <= dia_fechamento: entra na fatura do mês seguinte
+    Se compra > dia_fechamento: entra na fatura do mês + 2
     """
-    if expense_date.day <= card.closing_day:
-        # Fatura atual (mesmo mês)
-        return (expense_date.month, expense_date.year)
+    if purchase_date.day <= closing_day:
+        due_month = purchase_date.month + 1
     else:
-        # Próxima fatura
-        if expense_date.month == 12:
-            return (1, expense_date.year + 1)
-        return (expense_date.month + 1, expense_date.year)
-```
-
-#### Método: `distribute_installments(expense: Expense, card: Card) -> list[Expense]`
-
-Distribui parcelas nas faturas corretas, começando pela parcela 1.
-
-```python
-from decimal import Decimal, ROUND_DOWN
-from dateutil.relativedelta import relativedelta
-
-def distribute_installments(self, expense: Expense, card: Card) -> list[Expense]:
-    """
-    Distribui parcelas:
-    - Parcela 1: fatura calculada por calculate_first_invoice()
-    - Parcela 2: mês seguinte à parcela 1
-    - Parcela 3: mês seguinte à parcela 2
-    - ... e assim por diante
+        due_month = purchase_date.month + 2
     
-    Arredondamento:
-    - Valor base: total / parcelas (arredondado para baixo em centavos)
-    - Última parcela: recebe a diferença para fechar o total
-    """
-    installments = []
-    total = Decimal(str(expense.amount))
-    num_installments = expense.installments
+    # Ajustar ano se mês > 12
+    due_year = purchase_date.year + (due_month - 1) // 12
+    due_month = ((due_month - 1) % 12) + 1
     
-    # Calcula valor base (arredondado para baixo)
-    base_value = (total / num_installments).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    # Ajustar dia se mês não tem dia suficiente
+    from calendar import monthrange
+    max_day = monthrange(due_year, due_month)[1]
+    actual_due_day = min(due_day, max_day)
     
-    # Calcula fatura da primeira parcela
-    first_month, first_year = self.calculate_first_invoice(card, expense.expense_date)
-    
-    for i in range(num_installments):
-        # Calcula mês/ano desta parcela
-        invoice_date = date(first_year, first_month, 1) + relativedelta(months=i)
-        
-        # Última parcela recebe diferença de arredondamento
-        if i == num_installments - 1:
-            value = total - (base_value * (num_installments - 1))
-        else:
-            value = base_value
-        
-        installment = Expense(
-            amount=float(value),
-            item=expense.item,
-            description=expense.description,
-            card_id=expense.card_id,
-            category_id=expense.category_id,
-            category_type_override=expense.category_type_override,
-            payment_type=expense.payment_type,
-            installments=num_installments,
-            current_installment=i + 1,  # 1-indexed
-            expense_date=expense.expense_date,
-            invoice_month=invoice_date.month,
-            invoice_year=invoice_date.year,
-            confirmed=expense.confirmed,
-        )
-        installments.append(installment)
-    
-    return installments
-```
-
-#### Método: `calculate_invoice_due_date(card: Card, month: int, year: int) -> date`
-
-Calcula a data de vencimento de uma fatura.
-
-```python
-def calculate_invoice_due_date(self, card: Card, month: int, year: int) -> date:
-    """
-    Retorna a data de vencimento da fatura (dia do vencimento no mês/ano).
-    """
-    return date(year, month, card.due_day)
-```
-
-#### Exemplo de Uso
-
-```python
-# Compra: R$ 100 em 3x, dia 25/01/2026
-# Cartão: fecha dia 20, vence dia 28
-
-expense = Expense(amount=100.00, installments=3, expense_date=date(2026, 1, 25), ...)
-card = Card(closing_day=20, due_day=28, ...)
-
-# 25 > 20, então parcela 1 vai para FEVEREIRO
-installments = invoice_service.distribute_installments(expense, card)
-
-# Resultado:
-# [
-#   Expense(amount=33.33, current_installment=1, invoice_month=2, invoice_year=2026),  # FEV
-#   Expense(amount=33.33, current_installment=2, invoice_month=3, invoice_year=2026),  # MAR
-#   Expense(amount=33.34, current_installment=3, invoice_month=4, invoice_year=2026),  # ABR (centavo extra)
-# ]
+    return date(due_year, due_month, actual_due_day)
 ```
 
 ---
 
-### SVC-005: AlertService
+### API-006: /resumo — Resumo Mensal
 
-Scheduler para alertas de vencimento.
+- **FEAT:** FEAT-012
+- **Trigger:** Comando `/resumo` ou `/resumo <mes>`
+- **Auth:** Sessão autenticada
 
-#### Método: `check_due_invoices() -> list[Invoice]`
+#### Request
 
-Executado diariamente às 9h. Retorna faturas que vencem em 3 dias ou hoje.
+| Parâmetro | Tipo | Obrigatório | Default | Formato |
+|-----------|------|-------------|---------|---------|
+| mes | string | não | Mês atual | "02/2026" ou "fevereiro" |
+
+#### Response
+
+```
+📊 Resumo de Fevereiro/2026
+
+💰 Total gasto: R$2.450,00
+
+🏷️ Por categoria:
+• Alimentação: R$800,00 (32%)
+  ├─ Essencial: R$650,00
+  └─ Não Essencial: R$150,00
+• Transporte: R$400,00 (16%)
+
+📈 vs Janeiro: +12% (+R$260)
+
+[Ver despesas] [Exportar CSV]
+```
 
 ---
 
-## 4. Handlers do Telegram
+### API-007: /despesas — Listagem de Despesas
 
-### HDL-001: CommandHandler
+- **FEAT:** FEAT-013
+- **Trigger:** Comando `/despesas` ou `/despesas <mes>`
+- **Auth:** Sessão autenticada
+- **Paginação:** Offset-based, 10 por página
 
-| Comando | Handler | Service |
-|---------|---------|---------|
-| /start | `start_handler` | - |
-| /ajuda | `help_handler` | - |
-| /resumo | `summary_handler` | ExpenseService |
-| /cartoes | `cards_handler` | CardService |
-| /faturas | `invoices_handler` | InvoiceService |
-| /categorias | `categories_handler` | CategoryService |
+#### Paginação
 
-### HDL-002: MessageHandler (Áudio)
+| Parâmetro | Mínimo | Máximo | Default |
+|-----------|--------|--------|---------|
+| page | 1 | - | 1 |
+| per_page | 1 | 50 | 10 |
 
-```python
-async def audio_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Validar OWNER_ID
-    if update.effective_user.id != OWNER_TELEGRAM_ID:
-        return  # Ignorar silenciosamente
-    
-    # 2. Baixar áudio
-    voice = update.message.voice
-    if voice.duration > 60:
-        await update.message.reply_text("❌ Áudio muito longo. Máximo 60 segundos.")
-        return
-    
-    file = await voice.get_file()
-    audio_bytes = await file.download_as_bytearray()
-    
-    # 3. Transcrever
-    text = await audio_service.transcribe(audio_bytes)
-    
-    # 4. Extrair dados
-    expense_data = await extraction_service.extract(text)
-    
-    # 5. Criar pendente
-    expense = await expense_service.create_pending(expense_data)
-    
-    # 6. Mostrar preview
-    await show_preview(update, expense)
-```
+---
 
-### HDL-003: CallbackQueryHandler
+### API-008: /fatura — Visualizar Fatura
 
-```python
-async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    data = query.data
-    
-    if data.startswith("confirm_"):
-        expense_id = int(data.split("_")[1])
-        await expense_service.confirm(expense_id)
-        await query.answer("✅ Registrado!")
-        
-    elif data.startswith("cancel_"):
-        expense_id = int(data.split("_")[1])
-        await expense_service.cancel(expense_id)
-        await query.answer("❌ Cancelado")
-        
-    elif data.startswith("edit_"):
-        # Mostrar menu de edição
-        pass
-```
+- **FEAT:** FEAT-009
+- **Trigger:** Comando `/fatura <cartao> <mes>`
+- **Auth:** Sessão autenticada
 
-## 5. Integrações Externas
+---
+
+## 4. Integrações Externas
 
 | Integração | Tipo | Timeout | Retries | Fallback |
 |------------|------|---------|---------|----------|
-| Groq Whisper | REST API | 30s | 2 | Mensagem de erro |
-| Gemini Flash | REST API | 30s | 2 | Mensagem de erro |
-| Telegram API | REST/Polling | 60s | 3 | Log + retry |
+| Groq Whisper | REST API | 30s | 2 | OpenAI Whisper (só em erro) |
+| Gemini Flash 2.0 | REST API | 15s | 2 | - |
+| Telegram Bot API | Webhook | - | - | - |
 
-### Configuração APIs de IA
+### Groq Whisper
 
 ```python
-# config.py
-import os
+# Endpoint
+POST https://api.groq.com/openai/v1/audio/transcriptions
 
-# Groq (Speech-to-Text)
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_WHISPER_MODEL = "whisper-large-v3-turbo"
-GROQ_TIMEOUT = 30
-GROQ_MAX_RETRIES = 2
+# Headers
+Authorization: Bearer {GROQ_API_KEY}
 
-# Google AI (Gemini)
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL = "gemini-2.0-flash"
-GEMINI_TIMEOUT = 30
-GEMINI_MAX_RETRIES = 2
+# Request
+multipart/form-data:
+  - file: audio.ogg
+  - model: whisper-large-v3
+  - language: pt
+
+# Response
+{
+  "text": "Gastei trinta reais no Uber",
+  "language": "pt"
+}
+
+# Custo
+~$0.04/minuto de áudio
 ```
 
-## 6. Estrutura de Diretórios
+### Gemini Flash 2.0
 
-```
-telegram-finance-bot/
-├── src/
-│   ├── __init__.py
-│   ├── main.py                     # Entry point
-│   ├── config.py                   # Configurações
-│   │
-│   ├── handlers/                   # Telegram handlers
-│   │   ├── __init__.py
-│   │   ├── commands.py             # /start, /resumo, etc
-│   │   ├── audio.py                # Processamento de áudio
-│   │   └── callbacks.py            # Inline buttons
-│   │
-│   ├── services/                   # Lógica de negócio
-│   │   ├── __init__.py
-│   │   ├── audio_service.py        # Transcrição
-│   │   ├── extraction_service.py   # Extração LLM
-│   │   ├── expense_service.py      # CRUD gastos
-│   │   ├── card_service.py         # CRUD cartões
-│   │   ├── invoice_service.py      # Cálculo faturas
-│   │   └── alert_service.py        # Alertas
-│   │
-│   ├── repositories/               # Acesso a dados
-│   │   ├── __init__.py
-│   │   ├── base.py                 # Repository base
-│   │   ├── expense_repo.py
-│   │   ├── card_repo.py
-│   │   ├── category_repo.py
-│   │   └── invoice_repo.py
-│   │
-│   ├── models/                     # SQLAlchemy models
-│   │   ├── __init__.py
-│   │   ├── base.py                 # Base model
-│   │   ├── expense.py
-│   │   ├── card.py
-│   │   ├── category.py
-│   │   └── invoice.py
-│   │
-│   ├── schemas/                    # Pydantic schemas
-│   │   ├── __init__.py
-│   │   ├── expense.py
-│   │   ├── card.py
-│   │   └── extraction.py
-│   │
-│   └── utils/
-│       ├── __init__.py
-│       ├── groq_client.py          # Cliente Groq (Whisper STT)
-│       ├── gemini_client.py        # Cliente Google AI (Gemini)
-│       └── formatters.py           # Formatação de mensagens
-│
-├── migrations/                     # Alembic
-│   ├── env.py
-│   └── versions/
-│       └── 001_initial.py
-│
-├── tests/
-│   ├── __init__.py
-│   ├── conftest.py                 # Fixtures
-│   ├── test_audio_service.py
-│   ├── test_extraction_service.py
-│   ├── test_expense_service.py
-│   └── test_invoice_service.py
-│
-├── data/                           # SQLite database
-│   └── .gitkeep
-│
-├── .env.example
-├── .gitignore
-├── alembic.ini
-├── pyproject.toml
-├── README.md
-└── Dockerfile
+```python
+# Endpoint
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+
+# Request
+{
+  "contents": [{
+    "parts": [{
+      "text": "Extraia as despesas do texto: '{transcription}'\n\nRetorne JSON com: description, amount, date, category_suggestion, is_essential"
+    }]
+  }]
+}
+
+# Custo
+~$0.075/1M tokens entrada
+~$0.30/1M tokens saída
 ```
 
-## 7. Variáveis de Ambiente
+---
 
-```env
-# .env.example
+## 5. Requisitos Não-Funcionais
 
-# === Telegram ===
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-OWNER_TELEGRAM_ID=your_telegram_id_here
+| Requisito | Valor | Perfil | Como validar |
+|-----------|-------|--------|--------------|
+| Tempo transcrição | <3s | PESSOAL | Logs de processing_time_ms |
+| Tempo categorização | <1s | PESSOAL | Logs de processing_time_ms |
+| Tempo consulta resumo | <500ms | PESSOAL | Métricas de resposta |
+| Cobertura de testes | 40% | PESSOAL | pytest --cov |
+| Uptime | - | PESSOAL | N/A (local) |
 
-# === Groq (Speech-to-Text) ===
-GROQ_API_KEY=your_groq_api_key_here
+---
 
-# === Google AI (Gemini) ===
-GOOGLE_API_KEY=your_google_api_key_here
-
-# === Database ===
-DATABASE_URL=sqlite:///./data/finance.db
-
-# === App ===
-LOG_LEVEL=INFO
-ENVIRONMENT=development
-
-# === Alertas ===
-ALERT_HOUR=9
-ALERT_DAYS_BEFORE=3
-```
-
-## 8. Dependências
-
-```toml
-# pyproject.toml
-[project]
-name = "telegram-finance-bot"
-version = "1.0.0"
-requires-python = ">=3.10"
-
-dependencies = [
-    "python-telegram-bot[job-queue]>=22.0",
-    "groq>=0.4.0",
-    "google-generativeai>=0.8.0",
-    "sqlalchemy>=2.0",
-    "alembic>=1.18",
-    "pydantic>=2.12",
-    "pydantic-settings>=2.1",
-    "python-dotenv>=1.2",
-    "apscheduler>=3.10",
-    "httpx>=0.26",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
-    "pytest-cov>=4.1",
-    "ruff>=0.1",
-]
-```
-
-## 9. Estratégia de Testes
-
-### Cobertura por Feature
+## 6. Estratégia de Testes
 
 | FEAT | TEST IDs | Tipo | Cenários |
 |------|----------|------|----------|
-| FEAT-001 | TEST-001 a TEST-004 | unit | Transcrição válida, longa, erro API |
-| FEAT-002 | TEST-005 a TEST-010, TEST-039 a TEST-044 | unit | Extração completa, parcial, múltiplos itens, datas relativas |
-| FEAT-003 | TEST-011 a TEST-015 | unit, integration | Preview, confirm, cancel, timeout, múltiplos itens |
-| FEAT-004 | TEST-016 a TEST-019 | unit | Edição de campos |
-| FEAT-005 | TEST-020 a TEST-024 | unit | CRUD cartões |
-| FEAT-006 | TEST-025 a TEST-027 | unit | Cálculo de parcelas |
-| FEAT-007 | TEST-028 a TEST-031 | unit | Alertas |
-| FEAT-008 | TEST-032 a TEST-034 | integration | Resumo |
+| FEAT-001 | TEST-001, TEST-002, TEST-003 | integration | PIN válido, inválido, bloqueio |
+| FEAT-002 | TEST-010, TEST-011 | integration | Cartão válido, dígitos inválidos |
+| FEAT-003 | TEST-020, TEST-021, TEST-022 | integration | Transcrição, sem despesa, múltiplas |
+| FEAT-004 | TEST-030 | integration | Aprendizado |
+| FEAT-005 | TEST-023, TEST-024 | unit | Data relativa, futura |
+| FEAT-008 | TEST-042 | integration | Parcelas |
+| FEAT-009 | TEST-040, TEST-041 | unit | Vencimento antes/após |
+| FEAT-012 | TEST-050 | integration | Resumo mensal |
 
-### Testes de Múltiplos Itens e Datas (FEAT-002)
+### Cobertura por Tipo
 
-| TEST ID | Cenário | Input | Expected Output |
-|---------|---------|-------|-----------------|
-| TEST-039 | Múltiplos itens mesma compra | "20 de cerveja e 15 de carne no mercado" | 2 ExpenseItems |
-| TEST-040 | Classificação cerveja | "cerveja" | category_type: NAO_ESSENCIAL |
-| TEST-040 | Classificação carne | "carne" | category_type: ESSENCIAL |
-| TEST-041 | Data "ontem" | "gastei 50 ontem" | expense_date: today - 1 |
-| TEST-042 | Data dia da semana | "comprei na segunda" (hoje quarta) | expense_date: última segunda |
-| TEST-043 | Data "anteontem" | "paguei anteontem" | expense_date: today - 2 |
-| TEST-044 | Sem data | "gastei 100 no mercado" | expense_date: today |
+| Tipo | Quantidade | Prioridade |
+|------|------------|------------|
+| Unit | 4 | P0 |
+| Integration | 11 | P0/P1 |
+| E2E | 0 | N/A (PESSOAL) |
 
-### Fixtures
+---
 
-```python
-# tests/conftest.py
-import pytest
-from src.models import Category, Card
+## 7. Matriz de Rastreabilidade
 
-@pytest.fixture
-def categories():
-    return [
-        Category(id=1, name="Mercado", type="ESSENCIAL", icon="🛒"),
-        Category(id=2, name="Alimentação", type="NAO_ESSENCIAL", icon="🍔"),
-    ]
+| FEAT | RULE | API | TEST | ADR |
+|------|------|-----|------|-----|
+| FEAT-001 | RULE-007, RULE-008 | API-001, API-002 | TEST-001, TEST-002, TEST-003 | ADR-007 |
+| FEAT-002 | RULE-001 | API-001, API-003 | TEST-010, TEST-011 | - |
+| FEAT-003 | RULE-009, RULE-010 | API-004 | TEST-020, TEST-021, TEST-022 | ADR-005, ADR-006 |
+| FEAT-004 | RULE-003, RULE-005 | API-004 | TEST-030 | - |
+| FEAT-005 | - | API-004 | TEST-023, TEST-024 | - |
+| FEAT-006 | RULE-006 | API-004, API-005 | - | - |
+| FEAT-007 | - | API-004 | TEST-022 | - |
+| FEAT-008 | RULE-002 | API-005 | TEST-042 | ADR-008 |
+| FEAT-009 | RULE-004 | API-005, API-008 | TEST-040, TEST-041 | - |
+| FEAT-010 | RULE-001 | API-003 | TEST-010, TEST-011 | - |
+| FEAT-012 | - | API-006 | TEST-050 | - |
+| FEAT-013 | - | API-007 | - | - |
 
-@pytest.fixture
-def cards():
-    return [
-        Card(id=1, name="Nubank", due_day=10, closing_day=3, is_credit=True),
-        Card(id=2, name="Inter", due_day=15, closing_day=8, is_credit=True),
-    ]
+---
 
-@pytest.fixture
-def mock_groq_client(mocker):
-    client = mocker.Mock()
-    client.audio.transcriptions.create.return_value.text = "gastei 100 reais no mercado"
-    return client
-```
+## 8. Mapa de Erros Consolidado
 
-## 10. Matriz de Rastreabilidade
-
-| FEAT | RULE | SVC | HDL | TEST |
-|------|------|-----|-----|------|
-| FEAT-001 | RULE-001, RULE-002, RULE-003 | SVC-001 | HDL-002 | TEST-001 a TEST-004 |
-| FEAT-002 | RULE-004 a RULE-008, RULE-029 a RULE-032 | SVC-002 | HDL-002 | TEST-005 a TEST-010, TEST-039 a TEST-044 |
-| FEAT-003 | RULE-009 a RULE-012 | SVC-003 | HDL-003 | TEST-011 a TEST-015 |
-| FEAT-004 | RULE-013 a RULE-016 | SVC-003 | HDL-003 | TEST-016 a TEST-019 |
-| FEAT-005 | RULE-017 a RULE-019 | CardService | HDL-001 | TEST-020 a TEST-024 |
-| FEAT-006 | RULE-020 a RULE-022 | SVC-004 | - | TEST-025 a TEST-027 |
-| FEAT-007 | RULE-023 a RULE-025 | SVC-005 | - | TEST-028 a TEST-031 |
-| FEAT-008 | RULE-026 a RULE-028 | SVC-003 | HDL-001 | TEST-032 a TEST-034 |
-
-## 11. Mapa de Erros Consolidado
-
-| Code | HTTP | Quando | Mensagem | Ação |
-|------|------|--------|----------|------|
-| AUDIO.TOO_LONG | - | > 60s | "❌ Áudio muito longo. Máximo 60 segundos." | Rejeitar |
-| AUDIO.TRANSCRIPTION_FAILED | 503 | Groq Whisper falhou | "❌ Erro ao transcrever. Tente novamente." | Log + retry |
-| EXPENSE.EXTRACTION_FAILED | 503 | Gemini falhou | "❌ Erro ao processar. Tente novamente." | Log + retry |
-| EXPENSE.MISSING_AMOUNT | - | Sem valor | "💰 Qual foi o valor?" | Solicitar |
-| EXPENSE.MISSING_CARD | - | Crédito sem cartão | "💳 Qual cartão foi usado?" | Solicitar |
-| EXPENSE.TIMEOUT | - | 5 min sem resposta | "⏰ Tempo expirado." | Deletar pendente |
-| EXPENSE.INCOMPREHENSIBLE | - | Texto sem sentido | "❓ Não entendi." | Solicitar novo |
-| VALIDATION.* | 400 | Validação falhou | Específico por campo | Solicitar correção |
-| CARD.LIMIT_REACHED | - | > 10 cartões | "❌ Limite de 10 cartões." | Rejeitar |
-| CARD.NAME_TAKEN | 409 | Nome duplicado | "❌ Já existe um cartão com este nome." | Rejeitar |
-| INTERNAL.ERROR | 500 | Erro inesperado | "❌ Erro interno." | Log + alerta |
-
-## 12. Comandos de Desenvolvimento
-
-```bash
-# Instalar dependências
-pip install -e ".[dev]"
-
-# Rodar migrações
-alembic upgrade head
-
-# Rodar bot (desenvolvimento)
-python -m src.main
-
-# Rodar testes
-pytest
-
-# Rodar testes com cobertura
-pytest --cov=src --cov-report=html
-
-# Lint
-ruff check src tests
-ruff format src tests
-
-# Docker
-docker build -t telegram-finance-bot .
-docker run --env-file .env telegram-finance-bot
-```
+| Code | Severity | HTTP | Quando | Exemplo |
+|------|----------|------|--------|---------|
+| AUTH.INVALID_PIN | WARNING | - | PIN formato inválido | "abc123" |
+| AUTH.PIN_MISMATCH | WARNING | - | Confirmação diferente | "123456" vs "654321" |
+| AUTH.ACCOUNT_LOCKED | ERROR | - | 3 tentativas erradas | Bloqueio 15min |
+| AUTH.SESSION_EXPIRED | WARNING | - | 24h inatividade | Solicita PIN |
+| CARD.NAME_REQUIRED | WARNING | - | Nome vazio | "" |
+| CARD.INVALID_DIGITS | WARNING | - | Não numérico | "12AB" |
+| CARD.INVALID_CLOSING_DAY | WARNING | - | Fora 1-31 | 32 |
+| CARD.NOT_FOUND | WARNING | - | ID inexistente | UUID inválido |
+| CARD.DUPLICATE | WARNING | - | Nome duplicado | "Nubank" já existe |
+| AUDIO.FORMAT_NOT_SUPPORTED | WARNING | - | Formato inválido | .wav |
+| AUDIO.TOO_LONG | WARNING | - | > 60 segundos | 120s |
+| AUDIO.TRANSCRIPTION_FAILED | ERROR | - | Groq + fallback falhou | Timeout |
+| EXPENSE.NOT_DETECTED | INFO | - | Sem despesa | "Oi, tudo bem?" |
+| EXPENSE.FUTURE_DATE | WARNING | - | Data futura | "amanhã" |
+| REPORT.INVALID_MONTH | WARNING | - | Mês inválido | "abc" |
+| REPORT.NO_DATA | INFO | - | Sem dados | Mês sem despesas |
+| ENTRY.INVALID_TRANSITION | WARNING | - | Transição inválida | paid → pending |

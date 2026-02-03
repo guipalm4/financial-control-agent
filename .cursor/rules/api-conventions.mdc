@@ -1,0 +1,149 @@
+---
+description: Convenções de API e comandos do bot
+globs: ["src/features/**", "src/integrations/telegram/**"]
+---
+
+# API Conventions — Finance Bot Telegram
+
+## Padrão de Comandos
+
+### Nomenclatura
+- Comandos em snake_case: `/add_cartao`, `/list_cartoes`
+- Callbacks em snake_case com prefixo: `confirm_expense:`, `edit_field:`
+- Handlers agrupados por feature
+
+### Estrutura de Handler
+```python
+async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Descrição do comando.
+    
+    API-xxx: Nome do comando
+    FEAT: FEAT-xxx
+    """
+    user_id = update.effective_user.id
+    
+    # 1. Validar sessão
+    session = await get_session(user_id)
+    if not session.is_authenticated:
+        await update.message.reply_text("❌ Faça login primeiro com /start")
+        return
+    
+    # 2. Processar
+    try:
+        result = await service.process(...)
+    except DomainError as e:
+        await update.message.reply_text(f"❌ {e.message}")
+        return
+    
+    # 3. Responder
+    await update.message.reply_text("✅ Sucesso!")
+```
+
+## Padrão de Erros
+
+### Estrutura
+```python
+class DomainError(Exception):
+    def __init__(self, code: str, message: str, severity: str = "WARNING"):
+        self.code = code
+        self.message = message
+        self.severity = severity
+        self.trace_id = str(uuid4())
+```
+
+### Códigos por Domínio
+| Domínio | Prefixo | Exemplo |
+|---------|---------|---------|
+| Auth | AUTH. | AUTH.INVALID_PIN |
+| Card | CARD. | CARD.NOT_FOUND |
+| Expense | EXPENSE. | EXPENSE.NOT_DETECTED |
+| Audio | AUDIO. | AUDIO.TRANSCRIPTION_FAILED |
+| Report | REPORT. | REPORT.NO_DATA |
+
+### Severidades
+| Severity | Quando | Ação |
+|----------|--------|------|
+| CRITICAL | Sistema indisponível | Log + alerta |
+| ERROR | Falha recuperável | Log |
+| WARNING | Input inválido | Resposta ao usuário |
+| INFO | Informativo | Resposta ao usuário |
+
+## Validações
+
+### Padrão por Campo
+```python
+from pydantic import BaseModel, Field, validator
+
+class CardCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    last_digits: str = Field(..., pattern=r"^\d{4}$")
+    closing_day: int = Field(..., ge=1, le=31)
+    due_day: int = Field(..., ge=1, le=31)
+    
+    @validator("name")
+    def normalize_name(cls, v):
+        return v.strip()
+```
+
+### Erros de Validação
+```python
+{
+    "code": "CARD.VALIDATION_ERROR",
+    "message": "Dados inválidos",
+    "severity": "WARNING",
+    "details": [
+        {"field": "last_digits", "code": "INVALID_FORMAT", "message": "Digite 4 dígitos"}
+    ],
+    "traceId": "uuid"
+}
+```
+
+## Respostas Telegram
+
+### Formatação
+- Usar emojis para visual: 💰 📝 ✅ ❌ ⚠️
+- Negrito para valores: **R$30,00**
+- Código para datas: `01/02/2026`
+
+### Botões Inline
+```python
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+keyboard = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton("✅ Confirmar", callback_data=f"confirm:{id}"),
+        InlineKeyboardButton("✏️ Editar", callback_data=f"edit:{id}"),
+    ],
+    [
+        InlineKeyboardButton("❌ Cancelar", callback_data=f"cancel:{id}"),
+    ]
+])
+```
+
+## Logging
+
+### O que logar
+- Comandos recebidos (sem dados sensíveis)
+- Erros com trace_id
+- Tempo de processamento
+
+### O que NÃO logar
+- PIN (mesmo hash)
+- Valores financeiros
+- Transcrições completas
+- telegram_id em produção
+
+### Formato
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+logger.info(
+    "command_received",
+    command="/add_cartao",
+    user_hash=hash_user_id(user_id),  # Nunca o ID real
+    trace_id=trace_id,
+)
+```

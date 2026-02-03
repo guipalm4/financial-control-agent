@@ -1,0 +1,230 @@
+---
+description: Convenções de testes
+globs: ["tests/**", "**/*_test.py", "**/test_*.py"]
+---
+
+# Testing Conventions — Finance Bot Telegram
+
+## Perfil PESSOAL
+
+- **Cobertura mínima:** 40%
+- **Foco:** Testes unitários e integration críticos (P0)
+- **E2E:** Não obrigatório
+
+## Framework
+
+- **pytest** com plugins:
+  - `pytest-asyncio` — Testes async
+  - `pytest-cov` — Cobertura
+
+## Estrutura
+
+```
+tests/
+├── conftest.py              # Fixtures globais
+├── unit/
+│   ├── test_date_parser.py  # TEST-023, TEST-024
+│   ├── test_card_logic.py   # TEST-040, TEST-041
+│   └── test_validators.py
+├── integration/
+│   ├── test_auth.py         # TEST-001, TEST-002, TEST-003
+│   ├── test_cards.py        # TEST-010, TEST-011
+│   ├── test_expenses.py     # TEST-020, TEST-021, TEST-022, TEST-042
+│   └── test_reports.py      # TEST-050
+└── fixtures/
+    ├── users.py
+    ├── cards.py
+    └── expenses.py
+```
+
+## Padrão de Teste
+
+### Nomenclatura
+```python
+def test_<TEST_ID>_<descricao_curta>():
+    """
+    TEST-xxx: Descrição completa
+    FEAT: FEAT-xxx
+    Tipo: unit | integration
+    """
+```
+
+### Exemplo
+```python
+import pytest
+from datetime import date
+
+def test_040_vencimento_compra_antes_fechamento():
+    """
+    TEST-040: Vencimento quando compra antes do fechamento
+    FEAT: FEAT-009
+    Tipo: unit
+    """
+    # Given
+    card_closing = 22
+    card_due = 5
+    purchase_date = date(2026, 1, 21)  # Antes do fechamento
+    
+    # When
+    due_date = calcular_vencimento(purchase_date, card_closing, card_due)
+    
+    # Then
+    assert due_date == date(2026, 2, 5)
+```
+
+## Fixtures
+
+### conftest.py
+```python
+import pytest
+from sqlmodel import Session, SQLModel, create_engine
+
+@pytest.fixture(scope="session")
+def engine():
+    return create_engine("sqlite:///:memory:")
+
+@pytest.fixture(scope="function")
+def session(engine):
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
+    SQLModel.metadata.drop_all(engine)
+
+@pytest.fixture
+def authenticated_user(session):
+    from tests.fixtures.users import create_test_user
+    return create_test_user(session, authenticated=True)
+```
+
+### fixtures/users.py
+```python
+from uuid import uuid4
+from src.features.auth.models import User
+
+def create_test_user(session, authenticated: bool = False):
+    user = User(
+        id=uuid4(),
+        telegram_id=123456789,
+        pin_hash="$2b$12$...",  # Hash de "123456"
+    )
+    session.add(user)
+    session.commit()
+    return user
+```
+
+## Mocks
+
+### API Groq
+```python
+from unittest.mock import AsyncMock, patch
+
+@pytest.fixture
+def mock_groq():
+    with patch("src.integrations.groq.transcribe") as mock:
+        mock.return_value = {
+            "text": "Gastei trinta reais no Uber",
+            "confidence": 0.95
+        }
+        yield mock
+```
+
+### API Gemini
+```python
+@pytest.fixture
+def mock_gemini():
+    with patch("src.integrations.gemini.extract_entities") as mock:
+        mock.return_value = {
+            "confidence": 0.92,
+            "expenses": [{
+                "description": "Uber",
+                "amount": 30.00,
+                "category_suggestion": "Transporte"
+            }]
+        }
+        yield mock
+```
+
+## Testes Async
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_001_criacao_pin_valido(session, mock_telegram):
+    """
+    TEST-001: Criação de PIN com sucesso
+    FEAT: FEAT-001
+    Tipo: integration
+    """
+    # Given
+    telegram_id = 123456789
+    pin = "123456"
+    
+    # When
+    result = await create_user_with_pin(session, telegram_id, pin)
+    
+    # Then
+    assert result.id is not None
+    assert verify_pin(result.pin_hash, pin) is True
+```
+
+## Comandos
+
+```bash
+# Rodar todos os testes
+pytest
+
+# Com cobertura
+pytest --cov=src --cov-report=term-missing
+
+# Apenas unitários
+pytest tests/unit/
+
+# Apenas um teste específico
+pytest -k "test_040"
+
+# Verbose
+pytest -v
+
+# Parar no primeiro erro
+pytest -x
+```
+
+## Cobertura
+
+### pyproject.toml
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/main.py", "*/migrations/*"]
+
+[tool.coverage.report]
+fail_under = 40
+show_missing = true
+```
+
+## Prioridades
+
+| Prioridade | Descrição | Obrigatório |
+|------------|-----------|-------------|
+| P0 | Crítico — deve passar sempre | ✅ Sim |
+| P1 | Importante — deve passar na maioria | ⚠️ Recomendado |
+| P2 | Nice-to-have | ❌ Opcional |
+
+## Testes P0 (Obrigatórios)
+
+| TEST | FEAT | Descrição |
+|------|------|-----------|
+| TEST-001 | FEAT-001 | Criação de PIN válido |
+| TEST-002 | FEAT-001 | PIN formato inválido |
+| TEST-003 | FEAT-001 | Bloqueio após tentativas |
+| TEST-010 | FEAT-002 | Cadastro de cartão |
+| TEST-020 | FEAT-003 | Transcrição de áudio |
+| TEST-023 | FEAT-005 | Interpretação de data |
+| TEST-040 | FEAT-009 | Vencimento antes fechamento |
+| TEST-041 | FEAT-009 | Vencimento após fechamento |
+| TEST-042 | FEAT-008 | Parcelas distribuídas |

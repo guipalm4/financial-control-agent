@@ -1,0 +1,13 @@
+{
+	"mcpServers": {
+		"task-master-ai": {
+			"command": "npx",
+			"args": ["-y", "task-master-ai"],
+			"env": {
+				"TASK_MASTER_TOOLS": "core",
+				"ANTHROPIC_API_KEY": "your-anthropic-api-key-here",
+				"PERPLEXITY_API_KEY": "your-perplexity-api-key-here"
+			}
+		}
+	}
+}

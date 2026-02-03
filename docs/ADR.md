@@ -1,303 +1,317 @@
-# ADR — Telegram Finance Bot
+# ADR — Finance Bot Telegram
 
-> Architectural Decision Records — Decisões arquiteturais do projeto.
+> **Resumo:** Registro das decisões arquiteturais do projeto com contexto, alternativas e consequências.
 
 ---
 
-## ADR-001: Usar APIs de IA na Nuvem (Groq + Gemini)
+## ADR-001: Banco de Dados — PostgreSQL
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Arquiteto + Desenvolvedor
 
 ### Contexto
-
-Precisamos de:
-1. Transcrição de áudio (Speech-to-Text)
-2. Extração de dados estruturados de texto natural (LLM)
+O projeto precisa de um banco de dados para armazenar usuários, cartões, despesas e lançamentos. O perfil é PESSOAL com possível evolução para multi-user no futuro.
 
 ### Decisão
+Usar **PostgreSQL 16+** como banco de dados principal.
 
-Usar **APIs de IA na nuvem** com providers especializados:
-- **Groq Whisper Large v3 Turbo** para transcrição (STT)
-- **Gemini 2.0 Flash** para extração de dados (LLM)
-
-### Alternativas Consideradas
+### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Groq Whisper + Gemini Flash** ✅ | Latência muito baixa, tiers free generosos, modelos especializados | Duas API keys, requer internet |
-| Groq para ambos (Whisper + Llama) | Uma única API key | Llama inferior ao Gemini para extração estruturada |
-| Whisper local | Offline, privacidade total | Requer GPU, mais lento |
-| OpenAI API | Alta qualidade | Mais caro, latência maior |
-| Ollama/Llama local | Offline, gratuito | Requer RAM/GPU, qualidade inferior |
+| **PostgreSQL** ✅ | JSONB, robusto, evolução fácil | Mais pesado que SQLite |
+| SQLite | Zero config, leve | Sem suporte a JSONB, difícil escalar |
+| MongoDB | Flexível, schemaless | Eventual consistency, overhead operacional |
 
 ### Consequências
 
 **Ganhos:**
-- Latência muito baixa (~1-2s para áudio + extração)
-- Tiers free generosos (Groq: ~14K req/dia, Gemini: 15 RPM / 1M tokens/dia)
-- Sem necessidade de hardware especializado
-- Gemini Flash excelente para extração de JSON estruturado
+- Suporte a JSONB para dados semi-estruturados (extracted_data)
+- Índices parciais para soft delete
+- Caminho claro para escalar se necessário
+- Ecossistema maduro de ferramentas
 
 **Perdas:**
-- Requer conexão com internet
-- Duas API keys para gerenciar
-- Dados passam por servidores externos (aceitável para uso pessoal)
+- Requer container Docker adicional
+- Mais complexo que SQLite para MVP
 
 **Riscos:**
-- Providers podem mudar política de preços (mitigação: monitorar uso)
+- Overhead para projeto single-user (mitigado por ser local)
 
 ---
 
-## ADR-002: SQLite como Banco de Dados
+## ADR-002: Task Queue — FastAPI Background Tasks
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Arquiteto + Desenvolvedor
 
 ### Contexto
-
-Precisamos persistir dados financeiros (gastos, cartões, faturas).
+O processamento de áudio (transcrição + categorização) leva ~3s e não deve bloquear o bot. Precisa de processamento assíncrono.
 
 ### Decisão
+Usar **FastAPI BackgroundTasks** nativo ao invés de Celery + Redis.
 
-Usar **SQLite** com **SQLAlchemy 2.x**.
-
-### Alternativas Consideradas
+### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **SQLite** ✅ | Zero config, arquivo único, backup fácil, ACID | Não escala horizontalmente |
-| PostgreSQL | Robusto, escala | Overkill para 1 usuário, requer setup |
-| JSON files | Simples | Sem queries, sem ACID |
+| **FastAPI BackgroundTasks** ✅ | Simples, nativo, sem deps extras | Não escala horizontalmente |
+| Celery + Redis | Robusto, escalável | 2 containers extras, complexo |
+| ARQ + Redis | Async-native, leve | Requer Redis |
 
 ### Consequências
 
 **Ganhos:**
-- Zero configuração
-- Backup = copiar um arquivo
-- Suficiente para milhares de registros
-- Portável (levar banco para outro PC)
+- Menos containers (apenas API + DB)
+- Configuração simples
+- Suficiente para single-user
 
 **Perdas:**
-- Não escala para múltiplos usuários (não aplicável)
+- Não escala horizontalmente
+- Sem retry automático sofisticado
+
+**Riscos:**
+- Se migrar para multi-user, precisará reescrever para Celery (aceitável)
 
 ---
 
-## ADR-003: Confirmação Obrigatória Antes de Salvar
+## ADR-003: ORM — SQLModel
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Arquiteto + Desenvolvedor
 
 ### Contexto
-
-LLM pode extrair dados incorretos do áudio transcrito.
+Precisamos de um ORM para interagir com PostgreSQL. A aplicação usa FastAPI com Pydantic para validação.
 
 ### Decisão
+Usar **SQLModel 0.0.14+** que integra Pydantic + SQLAlchemy.
 
-Sempre mostrar **preview** e pedir **confirmação** antes de salvar.
-
-```
-[Áudio] → [Transcrição] → [Extração] → [PREVIEW] → [Confirmação] → [Salva]
-                                         ↑
-                                    Usuário valida
-```
-
-### Alternativas Consideradas
+### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Confirmação obrigatória** ✅ | Evita erros, transparência | Um clique extra |
-| Salvar direto | Mais rápido | Registros incorretos |
-| Confirmação opcional | Flexível | Inconsistência |
+| **SQLModel** ✅ | Pydantic integrado, menos boilerplate | Menos maduro |
+| SQLAlchemy puro | Maduro, completo | Boilerplate, Pydantic separado |
+| Tortoise ORM | Async-first | Menos documentação |
 
 ### Consequências
 
 **Ganhos:**
-- Usuário sempre valida antes de salvar
-- Permite correção imediata
-- Maior confiança nos dados
+- Modelos servem como schemas Pydantic automaticamente
+- Menos código duplicado
+- Validações integradas
 
 **Perdas:**
-- Um passo extra no fluxo
+- SQLModel ainda em evolução (v0.x)
+- Algumas features avançadas do SQLAlchemy menos acessíveis
+
+**Riscos:**
+- Breaking changes em versões futuras (mitigado por pinning de versão)
 
 ---
 
-## ADR-004: Classificação de Itens (ESSENCIAL vs NÃO ESSENCIAL)
+## ADR-004: Estrutura de Projeto — Monolito Modular
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
-
-### Contexto
-
-Usuário quer diferenciar gastos essenciais de não essenciais, inclusive dentro da mesma categoria (ex: carne vs cerveja, ambos no mercado).
-
-### Decisão
-
-- Categoria tem um **tipo padrão** (ESSENCIAL ou NÃO ESSENCIAL)
-- **Item específico** pode **sobrescrever** o tipo da categoria
-- LLM infere o tipo baseado no item mencionado
-
-### Lógica
-
-```
-Mercado (categoria) → default ESSENCIAL
-  ├── carne → ESSENCIAL (mantém)
-  ├── arroz → ESSENCIAL (mantém)
-  ├── cerveja → NÃO ESSENCIAL (sobrescreve)
-  └── refrigerante → NÃO ESSENCIAL (sobrescreve)
-```
-
-### Alternativas Consideradas
-
-| Opção | Prós | Contras |
-|-------|------|---------|
-| **Item sobrescreve categoria** ✅ | Granular, preciso | LLM precisa inferir |
-| Apenas categoria | Simples | Impreciso (cerveja = essencial?) |
-| Subcategorias fixas | Estruturado | Muitas categorias |
-
-### Consequências
-
-**Ganhos:**
-- Classificação precisa por item
-- Resumo financeiro mais útil (% essencial vs não essencial)
-
-**Perdas:**
-- Depende da qualidade da extração do LLM
-
----
-
-## ADR-005: Múltiplos Itens na Mesma Transcrição
-
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Arquiteto + Desenvolvedor
 
 ### Contexto
-
-Usuário pode dizer: "comprei 20 reais de cerveja e 15 de carne no mercado".
+Precisamos organizar o código de forma que seja fácil de manter e testar, mas sem over-engineering para um MVP.
 
 ### Decisão
-
-LLM retorna **array de itens** quando detecta múltiplos valores. Cada item vira um registro separado no banco.
+Usar **Monolito Modular** com separação por features.
 
 ### Estrutura
-
-```json
-// Input: "20 de cerveja e 15 de carne"
-// Output:
-{
-  "items": [
-    {"amount": 20, "item": "cerveja", "category_type": "NAO_ESSENCIAL"},
-    {"amount": 15, "item": "carne", "category_type": "ESSENCIAL"}
-  ]
-}
 ```
+src/features/
+├── auth/          # FEAT-001
+├── expenses/      # FEAT-003 a FEAT-009
+├── reports/       # FEAT-012, FEAT-013
+└── learning/      # FEAT-004
+```
+
+### Alternativas consideradas
+
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **Monolito Modular** ✅ | Separação clara, testável | Pode crescer demais |
+| Flat Structure | Simples para MVP | Difícil escalar |
+| DDD Lite | Bem organizado | Over-engineering para MVP |
 
 ### Consequências
 
 **Ganhos:**
-- Rastreabilidade por item
-- Classificação correta por item
-- Resumos mais precisos
+- Cada feature é isolada e testável
+- Fácil de entender a responsabilidade de cada módulo
+- Caminho claro para extrair microserviços se necessário
 
 **Perdas:**
-- Lógica de preview mais complexa (múltiplos itens)
+- Mais diretórios que flat structure
+
+**Riscos:**
+- Nenhum significativo
 
 ---
 
-## ADR-006: Detecção de Datas Relativas
+## ADR-005: Fallback de Transcrição — Apenas em Erro
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Usuário + Desenvolvedor
 
 ### Contexto
-
-Usuário pode dizer: "gastei 50 reais ontem" ou "comprei na segunda-feira".
+O sistema usa Groq Whisper Large para transcrição. Existe a opção de fallback para OpenAI Whisper se a confiança for baixa ou se houver erro.
 
 ### Decisão
+Usar fallback para OpenAI Whisper **apenas em caso de erro ou timeout** do Groq, não por confiança baixa.
 
-LLM recebe a **data atual** no prompt e converte expressões relativas para datas absolutas.
+### Alternativas consideradas
 
-### Mapeamento
-
-| Expressão | Cálculo |
-|-----------|---------|
-| "hoje" | data atual |
-| "ontem" | data atual - 1 |
-| "anteontem" | data atual - 2 |
-| "segunda/terça/..." | último dia da semana |
-| (sem data) | data atual |
-
-### Prompt
-
-```
-Data de hoje: 2026-01-29
-Dia da semana: quarta-feira
-
-Regras de data:
-- "ontem" = 2026-01-28
-- "anteontem" = 2026-01-27
-- "segunda" = 2026-01-27 (última segunda)
-```
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **Fallback em erro** ✅ | Mais barato, Groq suficiente | Sem segunda chance em baixa confiança |
+| Fallback se confiança < 0.7 | Mais preciso | Custo dobrado em alguns casos |
+| Sem fallback | Mais simples | Menos resiliente |
 
 ### Consequências
 
 **Ganhos:**
-- Registro na data correta do gasto (não da transcrição)
-- Fatura calculada corretamente
+- Custo previsível
+- Groq Whisper Large é suficiente para PT-BR
 
 **Perdas:**
-- Depende da interpretação do LLM
+- Não há "segunda opinião" em transcrições duvidosas
+
+**Riscos:**
+- Se Groq degradar qualidade, não há proteção (mitigado por confirmação manual)
 
 ---
 
-## ADR-007: Lógica de Parcelas por Fechamento
+## ADR-006: Retenção de Áudios — 7 Dias
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Usuário + Desenvolvedor
 
 ### Contexto
-
-Compras parceladas no cartão precisam ser distribuídas nas faturas corretas.
+Áudios são enviados para transcrição. Precisamos decidir se mantemos os arquivos originais e por quanto tempo.
 
 ### Decisão
+Manter áudios por **7 dias** após transcrição para debug, depois deletar automaticamente.
 
-- **Parcela 1** entra na fatura atual (se compra ≤ fechamento) ou próxima (se compra > fechamento)
-- **Parcelas 2, 3, 4...** entram nos meses seguintes à parcela 1
+### Alternativas consideradas
 
-### Exemplo
-
-```
-Cartão: fecha dia 20, vence dia 28
-Compra: R$300 em 3x no dia 25/01 (> fechamento)
-
-Parcela 1 → FEV/2026 (R$100)
-Parcela 2 → MAR/2026 (R$100)
-Parcela 3 → ABR/2026 (R$100)
-```
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **Manter 7 dias** ✅ | Permite debug | Uso de disco |
+| Deletar imediato | Privacidade máxima | Sem debug possível |
+| Manter sempre | Histórico completo | Disco infinito |
 
 ### Consequências
 
 **Ganhos:**
-- Faturas refletem a realidade dos cartões
-- Alertas de vencimento precisos
+- Permite investigar erros de transcrição
+- Não acumula dados infinitamente
+
+**Perdas:**
+- Uso de disco por 7 dias
+
+**Riscos:**
+- Nenhum significativo (dados locais)
 
 ---
 
-## Índice de ADRs
+## ADR-007: Sessão de Autenticação — 24h Inatividade
 
-| ID | Decisão | Status |
-|----|---------|--------|
-| ADR-001 | APIs de IA na nuvem (Groq + Gemini) | ✅ Aceito |
-| ADR-002 | SQLite como banco | ✅ Aceito |
-| ADR-003 | Confirmação obrigatória | ✅ Aceito |
-| ADR-004 | Item sobrescreve categoria | ✅ Aceito |
-| ADR-005 | Múltiplos itens por transcrição | ✅ Aceito |
-| ADR-006 | Datas relativas | ✅ Aceito |
-| ADR-007 | Parcelas por fechamento | ✅ Aceito |
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Arquiteto + Desenvolvedor
+
+### Contexto
+O bot requer PIN para autenticação. Precisamos definir quando solicitar PIN novamente.
+
+### Decisão
+Sessão expira após **24 horas de inatividade**. Cada interação renova o timer.
+
+### Alternativas consideradas
+
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **24h inatividade** ✅ | UX balanceada | Sessão longa se ativo |
+| 1h fixo | Mais seguro | UX ruim, pede PIN frequente |
+| Nunca expira | UX máxima | Inseguro |
+
+### Consequências
+
+**Ganhos:**
+- Usuário não precisa digitar PIN a cada uso
+- Segurança razoável para perfil PESSOAL
+
+**Perdas:**
+- Se dispositivo for comprometido, sessão ativa por até 24h
+
+**Riscos:**
+- Aceitável para perfil PESSOAL
+
+---
+
+## ADR-008: Modelo de Dados — Despesa vs Lançamento
+
+**Status:** Aceito  
+**Data:** 2026-02-01  
+**Decisores:** Arquiteto + Desenvolvedor
+
+### Contexto
+Despesas podem ser à vista (1 pagamento) ou parceladas (N pagamentos). Precisamos modelar isso corretamente.
+
+### Decisão
+Separar em duas tabelas: **`expenses`** (registro único) e **`entries`** (parcelas/lançamentos).
+
+### Modelo
+```
+expenses (1) ──────< entries (N)
+   │                    │
+   └─ valor_total       └─ valor_parcela
+   └─ num_parcelas      └─ data_vencimento
+                        └─ status (pending/paid)
+```
+
+### Alternativas consideradas
+
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **Despesa + Lançamentos** ✅ | Modelo correto, flexível | Mais tabelas |
+| Apenas Despesas | Simples | Não suporta parcelas bem |
+| Array de parcelas em JSON | Menos tabelas | Difícil consultar |
+
+### Consequências
+
+**Ganhos:**
+- Modelo correto para parcelamento
+- Fácil consultar "quanto devo em março"
+- Suporta faturas por cartão
+
+**Perdas:**
+- Mais complexidade de código
+
+**Riscos:**
+- Nenhum significativo
+
+---
+
+## Matriz de ADRs por Feature
+
+| ADR | Features Impactadas | Status |
+|-----|---------------------|--------|
+| ADR-001 | Todas | Aceito |
+| ADR-002 | FEAT-003 | Aceito |
+| ADR-003 | Todas | Aceito |
+| ADR-004 | Todas | Aceito |
+| ADR-005 | FEAT-003 | Aceito |
+| ADR-006 | FEAT-003 | Aceito |
+| ADR-007 | FEAT-001 | Aceito |
+| ADR-008 | FEAT-008, FEAT-009 | Aceito |
