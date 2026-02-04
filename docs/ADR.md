@@ -1,317 +1,275 @@
 # ADR — Finance Bot Telegram
 
-> **Resumo:** Registro das decisões arquiteturais do projeto com contexto, alternativas e consequências.
+> **Resumo executivo:** Registro das decisões arquiteturais do Finance Bot, incluindo escolha de stack, modelo de dados e estratégias de integração com APIs externas.
 
 ---
 
-## ADR-001: Banco de Dados — PostgreSQL
+## ADR-001: Stack Backend Python + FastAPI
 
 **Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Arquiteto + Desenvolvedor
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
-O projeto precisa de um banco de dados para armazenar usuários, cartões, despesas e lançamentos. O perfil é PESSOAL com possível evolução para multi-user no futuro.
+
+O projeto precisa de um backend para:
+- Servir webhooks do Telegram
+- Integrar com APIs de IA (Groq, Gemini)
+- Gerenciar dados no PostgreSQL
+- Processar áudio de forma assíncrona
 
 ### Decisão
-Usar **PostgreSQL 16+** como banco de dados principal.
+
+Usar **Python 3.13+ com FastAPI 0.128.x** como framework web.
 
 ### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **PostgreSQL** ✅ | JSONB, robusto, evolução fácil | Mais pesado que SQLite |
-| SQLite | Zero config, leve | Sem suporte a JSONB, difícil escalar |
-| MongoDB | Flexível, schemaless | Eventual consistency, overhead operacional |
+| **FastAPI** | Async nativo, validação Pydantic, docs automáticas, ecossistema IA | Curva de aprendizado para async |
+| Flask | Simples, maduro | Sync por padrão, sem validação nativa |
+| Node.js + Fastify | Muito rápido, bom para I/O | Menos bibliotecas de IA, tipagem opcional |
 
 ### Consequências
 
 **Ganhos:**
-- Suporte a JSONB para dados semi-estruturados (extracted_data)
-- Índices parciais para soft delete
-- Caminho claro para escalar se necessário
-- Ecossistema maduro de ferramentas
+- Suporte nativo a async/await para I/O (Telegram, Groq, Gemini)
+- Validação automática com Pydantic
+- Documentação OpenAPI automática
+- Excelente integração com bibliotecas de IA Python
 
 **Perdas:**
-- Requer container Docker adicional
-- Mais complexo que SQLite para MVP
+- Nenhuma significativa para este caso de uso
 
 **Riscos:**
-- Overhead para projeto single-user (mitigado por ser local)
+- Complexidade de async pode gerar bugs difíceis de debugar
 
 ---
 
-## ADR-002: Task Queue — FastAPI Background Tasks
+## ADR-002: ORM SQLModel (SQLAlchemy + Pydantic)
 
 **Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Arquiteto + Desenvolvedor
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
-O processamento de áudio (transcrição + categorização) leva ~3s e não deve bloquear o bot. Precisa de processamento assíncrono.
+
+Precisamos de um ORM para:
+- Definir modelos de dados
+- Validar dados de entrada/saída
+- Integrar com FastAPI de forma natural
 
 ### Decisão
-Usar **FastAPI BackgroundTasks** nativo ao invés de Celery + Redis.
+
+Usar **SQLModel 0.0.24** como ORM, que combina SQLAlchemy com Pydantic.
 
 ### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **FastAPI BackgroundTasks** ✅ | Simples, nativo, sem deps extras | Não escala horizontalmente |
-| Celery + Redis | Robusto, escalável | 2 containers extras, complexo |
-| ARQ + Redis | Async-native, leve | Requer Redis |
+| **SQLModel** | Combina ORM + validação, mesma sintaxe do FastAPI | Relativamente novo (0.0.x) |
+| SQLAlchemy puro | Maduro, completo | Duplicação: modelos ORM + Pydantic separados |
+| Prisma (Python) | Tipagem forte, migrations | Menos maduro em Python |
 
 ### Consequências
 
 **Ganhos:**
-- Menos containers (apenas API + DB)
-- Configuração simples
-- Suficiente para single-user
-
-**Perdas:**
-- Não escala horizontalmente
-- Sem retry automático sofisticado
-
-**Riscos:**
-- Se migrar para multi-user, precisará reescrever para Celery (aceitável)
-
----
-
-## ADR-003: ORM — SQLModel
-
-**Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Arquiteto + Desenvolvedor
-
-### Contexto
-Precisamos de um ORM para interagir com PostgreSQL. A aplicação usa FastAPI com Pydantic para validação.
-
-### Decisão
-Usar **SQLModel 0.0.14+** que integra Pydantic + SQLAlchemy.
-
-### Alternativas consideradas
-
-| Opção | Prós | Contras |
-|-------|------|---------|
-| **SQLModel** ✅ | Pydantic integrado, menos boilerplate | Menos maduro |
-| SQLAlchemy puro | Maduro, completo | Boilerplate, Pydantic separado |
-| Tortoise ORM | Async-first | Menos documentação |
-
-### Consequências
-
-**Ganhos:**
-- Modelos servem como schemas Pydantic automaticamente
+- Um único modelo para banco e validação
+- Integração perfeita com FastAPI
 - Menos código duplicado
-- Validações integradas
 
 **Perdas:**
-- SQLModel ainda em evolução (v0.x)
-- Algumas features avançadas do SQLAlchemy menos acessíveis
+- Documentação menos extensa que SQLAlchemy puro
 
 **Riscos:**
-- Breaking changes em versões futuras (mitigado por pinning de versão)
+- Versão 0.0.x pode ter breaking changes (mitigado: fixar versão)
 
 ---
 
-## ADR-004: Estrutura de Projeto — Monolito Modular
+## ADR-003: Biblioteca python-telegram-bot
 
 **Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Arquiteto + Desenvolvedor
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
-Precisamos organizar o código de forma que seja fácil de manter e testar, mas sem over-engineering para um MVP.
+
+Precisamos interagir com a API do Telegram para:
+- Receber mensagens e áudios
+- Enviar respostas com botões inline
+- Gerenciar estado de conversação
 
 ### Decisão
-Usar **Monolito Modular** com separação por features.
 
-### Estrutura
-```
-src/features/
-├── auth/          # FEAT-001
-├── expenses/      # FEAT-003 a FEAT-009
-├── reports/       # FEAT-012, FEAT-013
-└── learning/      # FEAT-004
-```
+Usar **python-telegram-bot v22.5** como biblioteca oficial do Telegram.
 
 ### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Monolito Modular** ✅ | Separação clara, testável | Pode crescer demais |
-| Flat Structure | Simples para MVP | Difícil escalar |
-| DDD Lite | Bem organizado | Over-engineering para MVP |
+| **python-telegram-bot** | Oficial, bem documentada, async nativo | API verbosa |
+| aiogram | Moderno, async first | Menos documentação |
+| Telegraf (Node.js) | Muito popular | Mudaria stack para Node.js |
 
 ### Consequências
 
 **Ganhos:**
-- Cada feature é isolada e testável
-- Fácil de entender a responsabilidade de cada módulo
-- Caminho claro para extrair microserviços se necessário
+- Biblioteca oficial, mantida ativamente
+- Excelente documentação e exemplos
+- Suporte completo a todas as features do Telegram
 
 **Perdas:**
-- Mais diretórios que flat structure
+- API pode ser verbosa para casos simples
+
+**Riscos:**
+- Nenhum significativo (biblioteca estável)
+
+---
+
+## ADR-004: Modelo de Dados Expense/Entry (Despesa/Lançamento)
+
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
+
+### Contexto
+
+Despesas podem ser:
+- À vista (1 lançamento)
+- Parceladas (N lançamentos em faturas diferentes)
+- No débito (1 lançamento, data = compra)
+- No crédito (1+ lançamentos, data = vencimento fatura)
+
+### Decisão
+
+Separar em duas entidades:
+- **Expense:** Registro da despesa original (valor total, descrição, categoria)
+- **Entry:** Lançamentos individuais (parcela, valor, data de vencimento, status)
+
+### Alternativas consideradas
+
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **Expense + Entry** | Flexível, rastreia parcelas, calcula faturas | Mais complexo |
+| Apenas Expense | Simples | Não suporta parcelamento corretamente |
+| Expense com array de parcelas | Menos tabelas | Mais difícil consultar faturas |
+
+### Consequências
+
+**Ganhos:**
+- Consultas de fatura por mês são simples (WHERE due_date BETWEEN...)
+- Histórico de parcelas preservado
+- Status por parcela (pending, paid, cancelled)
+
+**Perdas:**
+- Mais JOINs em algumas consultas
 
 **Riscos:**
 - Nenhum significativo
 
 ---
 
-## ADR-005: Fallback de Transcrição — Apenas em Erro
+## ADR-005: Transcrição com Groq Whisper + Fallback
 
 **Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Usuário + Desenvolvedor
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
-O sistema usa Groq Whisper Large para transcrição. Existe a opção de fallback para OpenAI Whisper se a confiança for baixa ou se houver erro.
+
+Áudios precisam ser transcritos para texto antes da extração de entidades. Groq oferece Whisper com latência muito baixa.
 
 ### Decisão
-Usar fallback para OpenAI Whisper **apenas em caso de erro ou timeout** do Groq, não por confiança baixa.
+
+Usar **Groq Whisper** como serviço primário de transcrição, sem fallback no MVP (simplicidade).
 
 ### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Fallback em erro** ✅ | Mais barato, Groq suficiente | Sem segunda chance em baixa confiança |
-| Fallback se confiança < 0.7 | Mais preciso | Custo dobrado em alguns casos |
-| Sem fallback | Mais simples | Menos resiliente |
+| **Groq Whisper** | Muito rápido (~1s), barato | Menos conhecido |
+| OpenAI Whisper | Original, mais recursos | Mais caro, mais lento |
+| Whisper local | Sem custo de API | Requer GPU, mais complexo |
 
 ### Consequências
 
 **Ganhos:**
-- Custo previsível
-- Groq Whisper Large é suficiente para PT-BR
+- Transcrição em ~1 segundo
+- Custo baixo
+- API simples
 
 **Perdas:**
-- Não há "segunda opinião" em transcrições duvidosas
+- Dependência de serviço externo
 
 **Riscos:**
-- Se Groq degradar qualidade, não há proteção (mitigado por confirmação manual)
+- Indisponibilidade do Groq (mitigado: retry + mensagem de erro amigável)
 
 ---
 
-## ADR-006: Retenção de Áudios — 7 Dias
+## ADR-006: Categorização com Gemini Flash + Aprendizado Local
 
 **Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Usuário + Desenvolvedor
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
-Áudios são enviados para transcrição. Precisamos decidir se mantemos os arquivos originais e por quanto tempo.
+
+Despesas precisam ser categorizadas. O sistema deve aprender padrões do usuário.
 
 ### Decisão
-Manter áudios por **7 dias** após transcrição para debug, depois deletar automaticamente.
+
+Estratégia híbrida:
+1. **Primeiro:** Buscar no histórico local (se descrição normalizada já foi categorizada 3+ vezes)
+2. **Se não encontrar:** Usar Gemini Flash para categorização por IA
 
 ### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Manter 7 dias** ✅ | Permite debug | Uso de disco |
-| Deletar imediato | Privacidade máxima | Sem debug possível |
-| Manter sempre | Histórico completo | Disco infinito |
+| **Híbrido (local + LLM)** | Aprende, reduz custos, rápido para padrões | Mais complexo |
+| Só LLM | Simples | Custo maior, não aprende |
+| Só regras locais | Zero custo | Não generaliza |
 
 ### Consequências
 
 **Ganhos:**
-- Permite investigar erros de transcrição
-- Não acumula dados infinitamente
+- Redução de chamadas à API ao longo do tempo
+- Categorização personalizada
+- Fallback para LLM em casos novos
 
 **Perdas:**
-- Uso de disco por 7 dias
+- Complexidade de implementação do cache de aprendizado
 
 **Riscos:**
-- Nenhum significativo (dados locais)
+- Aprendizado incorreto se usuário errar categorização (mitigado: mínimo 3 confirmações)
 
 ---
 
-## ADR-007: Sessão de Autenticação — 24h Inatividade
+## ADR-007: Armazenamento de Áudio Temporário
 
 **Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Arquiteto + Desenvolvedor
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
-O bot requer PIN para autenticação. Precisamos definir quando solicitar PIN novamente.
+
+Áudios são recebidos do Telegram, processados e não são mais necessários após a transcrição.
 
 ### Decisão
-Sessão expira após **24 horas de inatividade**. Cada interação renova o timer.
 
-### Alternativas consideradas
-
-| Opção | Prós | Contras |
-|-------|------|---------|
-| **24h inatividade** ✅ | UX balanceada | Sessão longa se ativo |
-| 1h fixo | Mais seguro | UX ruim, pede PIN frequente |
-| Nunca expira | UX máxima | Inseguro |
+- Armazenar áudio localmente apenas durante processamento
+- Deletar após transcrição bem-sucedida
+- Cleanup job para áudios não processados após 7 dias (RULE-009)
 
 ### Consequências
 
 **Ganhos:**
-- Usuário não precisa digitar PIN a cada uso
-- Segurança razoável para perfil PESSOAL
+- Economia de espaço
+- Privacidade (dados não persistem)
+- Simplicidade
 
 **Perdas:**
-- Se dispositivo for comprometido, sessão ativa por até 24h
+- Não é possível re-transcrever (precisa novo áudio)
 
 **Riscos:**
-- Aceitável para perfil PESSOAL
-
----
-
-## ADR-008: Modelo de Dados — Despesa vs Lançamento
-
-**Status:** Aceito  
-**Data:** 2026-02-01  
-**Decisores:** Arquiteto + Desenvolvedor
-
-### Contexto
-Despesas podem ser à vista (1 pagamento) ou parceladas (N pagamentos). Precisamos modelar isso corretamente.
-
-### Decisão
-Separar em duas tabelas: **`expenses`** (registro único) e **`entries`** (parcelas/lançamentos).
-
-### Modelo
-```
-expenses (1) ──────< entries (N)
-   │                    │
-   └─ valor_total       └─ valor_parcela
-   └─ num_parcelas      └─ data_vencimento
-                        └─ status (pending/paid)
-```
-
-### Alternativas consideradas
-
-| Opção | Prós | Contras |
-|-------|------|---------|
-| **Despesa + Lançamentos** ✅ | Modelo correto, flexível | Mais tabelas |
-| Apenas Despesas | Simples | Não suporta parcelas bem |
-| Array de parcelas em JSON | Menos tabelas | Difícil consultar |
-
-### Consequências
-
-**Ganhos:**
-- Modelo correto para parcelamento
-- Fácil consultar "quanto devo em março"
-- Suporta faturas por cartão
-
-**Perdas:**
-- Mais complexidade de código
-
-**Riscos:**
-- Nenhum significativo
-
----
-
-## Matriz de ADRs por Feature
-
-| ADR | Features Impactadas | Status |
-|-----|---------------------|--------|
-| ADR-001 | Todas | Aceito |
-| ADR-002 | FEAT-003 | Aceito |
-| ADR-003 | Todas | Aceito |
-| ADR-004 | Todas | Aceito |
-| ADR-005 | FEAT-003 | Aceito |
-| ADR-006 | FEAT-003 | Aceito |
-| ADR-007 | FEAT-001 | Aceito |
-| ADR-008 | FEAT-008, FEAT-009 | Aceito |
+- Perda de contexto em caso de erro (mitigado: log de erro com detalhes)

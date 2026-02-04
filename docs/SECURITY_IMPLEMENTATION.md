@@ -1,6 +1,6 @@
 # Security Implementation — Finance Bot Telegram
 
-> **Resumo executivo:** Implementação de segurança simplificada para perfil PESSOAL. Foco em proteção de dados financeiros pessoais com PIN hasheado, sessões com expiração, e boas práticas de desenvolvimento. Sem exposição externa (ambiente local).
+> **Resumo executivo:** Especificação de segurança simplificada para perfil PESSOAL. Foco em proteção básica de dados financeiros pessoais, autenticação via PIN e gestão segura de segredos.
 
 ---
 
@@ -10,170 +10,133 @@
 
 | Ativo | Classificação | Impacto se comprometido |
 |-------|---------------|-------------------------|
-| Dados financeiros (valores, categorias) | PII | Exposição de hábitos de consumo |
-| Credenciais (PIN hash) | Sensível | Acesso não autorizado ao bot |
-| Áudios temporários | Temporário | Exposição de voz do usuário |
-| API Keys (Groq, Gemini) | Segredo | Uso indevido e custos |
+| Dados financeiros | Pessoal/Sensível | Exposição de hábitos de gastos |
+| PIN do usuário | Sensível | Acesso não autorizado |
+| API Keys (Groq, Gemini) | Segredo | Uso indevido, custos |
+| Bot Token | Segredo | Controle do bot |
 
 ### Vetores de Ataque (Contexto Local)
 
-| Vetor | Risco | Mitigação |
-|-------|-------|-----------|
-| Acesso físico ao dispositivo | Médio | PIN + sessão com expiração |
-| Comprometimento de .env | Alto | Não versionar, permissões restritas |
-| Telegram Bot Token exposto | Alto | .env, rotação manual |
-| SQL Injection | Baixo | SQLModel (ORM com queries parametrizadas) |
+| Vetor | Ativo alvo | Probabilidade | Mitigação |
+|-------|------------|---------------|-----------|
+| Acesso físico ao servidor | Todos | Baixa (localhost) | Senha no host |
+| Telegram ID spoofing | Dados | Média | Validar telegram_id único |
+| Brute force PIN | PIN | Média | Bloqueio após 3 tentativas |
+| Exposição de .env | API Keys | Baixa | .gitignore, permissões |
+| Logs com dados sensíveis | Dados | Média | Logging seguro |
 
 ---
 
 ## 2. Classificação de Dados
 
-| Dado | Classificação | Retenção | Criptografia |
-|------|---------------|----------|--------------|
-| telegram_id | PII | Indefinida | Em repouso (DB) |
-| PIN | Sensível | Indefinida | Hash bcrypt |
-| Valores financeiros | PII | Indefinida | Em repouso (DB) |
-| Áudios | Temporário | 7 dias | Não (local) |
-| API Keys | Segredo | N/A | .env (não versionado) |
+| Dado | Classificação | Retenção | Minimização | Criptografia |
+|------|---------------|----------|-------------|--------------|
+| telegram_id | Identificador | Permanente | Não | - |
+| PIN | Sensível | Permanente | Hash only | bcrypt (cost=12) |
+| Despesas (valores) | Pessoal | Permanente | Não | - |
+| Descrições | Pessoal | Permanente | Não | - |
+| Áudio | Temporário | 7 dias | Deletar após transcrição | - |
+| API Keys | Segredo | - | .env only | - |
 
 ---
 
-## 3. AuthN (Autenticação)
+## 3. Autenticação (AuthN)
 
 ### Configurações
 
 | Parâmetro | Valor | Justificativa |
 |-----------|-------|---------------|
-| PIN formato | 4-6 dígitos | Balança segurança/usabilidade |
+| PIN length | 4-6 dígitos | Balance segurança/usabilidade |
 | Hash algorithm | bcrypt | OWASP recomendado |
-| Hash cost | 12 | Seguro e performático |
-| Sessão duração | 24h inatividade | UX para uso pessoal |
-| Tentativas antes bloqueio | 3 | Proteção brute-force |
-| Tempo de bloqueio | 15 minutos | Razoável para uso pessoal |
-
-### Implementação PIN
-
-```python
-import bcrypt
-
-def hash_pin(pin: str) -> str:
-    """Hash PIN com bcrypt cost=12"""
-    return bcrypt.hashpw(pin.encode(), bcrypt.gensalt(12)).decode()
-
-def verify_pin(pin_hash: str, pin: str) -> bool:
-    """Verificar PIN contra hash"""
-    return bcrypt.checkpw(pin.encode(), pin_hash.encode())
-```
+| bcrypt cost | 12 | ~250ms por hash |
+| Sessão expiry | 24h | Conveniência (uso pessoal) |
+| Lock after | 3 tentativas | Proteção brute force |
+| Lock duration | 15 minutos | Dissuasão sem bloquear permanente |
 
 ### Fluxo de Autenticação
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Unauthenticated: /start
-    Unauthenticated --> CreatingPIN: Novo usuário
-    Unauthenticated --> ValidatingPIN: Usuário existente
-    CreatingPIN --> Authenticated: PIN válido
-    ValidatingPIN --> Authenticated: PIN correto
-    ValidatingPIN --> Locked: 3 tentativas
-    Locked --> ValidatingPIN: 15min
-    Authenticated --> Unauthenticated: 24h inatividade
-    Authenticated --> [*]: Uso normal
+flowchart TD
+    A[Usuário envia /start] --> B{Usuário existe?}
+    B -->|Não| C[Criar PIN]
+    B -->|Sim| D{Conta bloqueada?}
+    D -->|Sim| E[Mostrar tempo restante]
+    D -->|Não| F[Pedir PIN]
+    F --> G{PIN correto?}
+    G -->|Sim| H[Criar sessão 24h]
+    G -->|Não| I[Incrementar tentativas]
+    I --> J{3 tentativas?}
+    J -->|Sim| K[Bloquear 15min]
+    J -->|Não| F
 ```
 
-### Recuperação de Acesso (PESSOAL)
-
-| Método | Procedimento |
-|--------|--------------|
-| Reset manual | `UPDATE users SET pin_hash = NULL, pin_attempts = 0, locked_until = NULL WHERE telegram_id = XXX` |
-
----
-
-## 4. AuthZ (Autorização)
-
-### Matriz de Permissões
-
-| Ação | Requer Auth | Verificações |
-|------|-------------|--------------|
-| /start | Não | - |
-| /add_cartao | Sim | Session válida |
-| Enviar áudio | Sim | Session válida |
-| /resumo | Sim | Session válida |
-| /despesas | Sim | Session válida |
-| /fatura | Sim | Session válida |
-
-### Verificação de Sessão
+### Implementação
 
 ```python
-async def require_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Decorator para verificar autenticação"""
-    user_id = update.effective_user.id
-    session = await get_session(user_id)
-    
-    if not session or not session.is_authenticated:
-        await update.message.reply_text("❌ Faça login primeiro com /start")
-        return False
-    
-    if session.expires_at < datetime.utcnow():
-        await update.message.reply_text("⚠️ Sessão expirada. Digite seu PIN:")
-        session.is_authenticated = False
-        return False
-    
-    # Renovar sessão
-    session.last_activity_at = datetime.utcnow()
-    session.expires_at = datetime.utcnow() + timedelta(hours=24)
-    return True
+from passlib.hash import bcrypt
+
+# Criar hash
+pin_hash = bcrypt.using(rounds=12).hash(pin)
+
+# Verificar PIN
+is_valid = bcrypt.verify(pin_input, user.pin_hash)
 ```
 
 ---
 
-## 5. OWASP Top 10 (Aplicável)
+## 4. Autorização (AuthZ)
 
-| # | Vulnerabilidade | Aplica? | Mitigação | Status |
-|---|-----------------|---------|-----------|--------|
-| A01 | Broken Access Control | ✅ | Verificar telegram_id em cada request | ✅ |
-| A02 | Cryptographic Failures | ✅ | bcrypt para PIN, HTTPS para webhook | ✅ |
-| A03 | Injection | ✅ | SQLModel ORM (queries parametrizadas) | ✅ |
-| A04 | Insecure Design | ⚠️ | Seguir princípios de mínimo privilégio | ✅ |
-| A05 | Security Misconfiguration | ✅ | .env não versionado, permissões restritas | ✅ |
-| A06 | Vulnerable Components | ⚠️ | Manter deps atualizadas | Manual |
-| A07 | Auth Failures | ✅ | PIN hasheado, bloqueio após tentativas | ✅ |
-| A08 | Data Integrity Failures | ⚠️ | N/A (ambiente local) | N/A |
-| A09 | Logging Failures | ✅ | Não logar PII/secrets | ✅ |
-| A10 | SSRF | ❌ | N/A | N/A |
+### Modelo Simplificado (Single-User)
+
+| Operação | Quem pode | Validação |
+|----------|-----------|-----------|
+| Todas as operações | Usuário único | telegram_id == user.telegram_id |
+
+### Validação de Telegram ID
+
+```python
+async def validate_user(update: Update) -> User | None:
+    telegram_id = update.effective_user.id
+    user = await get_user_by_telegram_id(telegram_id)
+    
+    if not user:
+        return None  # Não autorizado
+    
+    if user.locked_until and user.locked_until > datetime.utcnow():
+        return None  # Conta bloqueada
+    
+    if user.session_expires_at and user.session_expires_at < datetime.utcnow():
+        return None  # Sessão expirada
+    
+    return user
+```
+
+---
+
+## 5. OWASP Top 10 (Contexto Bot Telegram)
+
+| # | Vulnerabilidade | Aplica? | Mitigação |
+|---|-----------------|---------|-----------|
+| A01 | Broken Access Control | Parcial | Validar telegram_id em toda operação |
+| A02 | Cryptographic Failures | Sim | bcrypt para PIN, HTTPS para APIs |
+| A03 | Injection | Sim | SQLModel (parameterized), validação Pydantic |
+| A04 | Insecure Design | Não | Design simples, single-user |
+| A05 | Security Misconfiguration | Sim | .env para segredos, Docker isolado |
+| A06 | Vulnerable Components | Parcial | Fixar versões no requirements.txt |
+| A07 | Auth Failures | Sim | Bloqueio após tentativas, sessão expira |
+| A08 | Software/Data Integrity | Não | Ambiente local, não há CI/CD |
+| A09 | Logging Failures | Sim | Não logar PIN, valores completos |
+| A10 | SSRF | Não | Não há requests dinâmicos |
 
 ---
 
 ## 6. Rate Limiting (Básico)
 
-| Contexto | Limite | Janela | Ação se exceder |
+| Operação | Limite | Janela | Ação se exceder |
 |----------|--------|--------|-----------------|
-| Tentativas PIN | 3 | Por sessão | Bloquear 15min |
-| Mensagens/min | 30 | 1 minuto | Ignorar silenciosamente |
-| Áudios/dia | Sem limite | - | - |
-
-### Implementação
-
-```python
-from datetime import datetime, timedelta
-from collections import defaultdict
-
-# Rate limiter simples em memória
-rate_limits = defaultdict(list)
-
-def check_rate_limit(user_id: int, limit: int = 30, window_seconds: int = 60) -> bool:
-    """Verifica rate limit básico"""
-    now = datetime.utcnow()
-    cutoff = now - timedelta(seconds=window_seconds)
-    
-    # Limpar entradas antigas
-    rate_limits[user_id] = [t for t in rate_limits[user_id] if t > cutoff]
-    
-    if len(rate_limits[user_id]) >= limit:
-        return False
-    
-    rate_limits[user_id].append(now)
-    return True
-```
+| Tentativas de PIN | 3 | Sessão | Bloquear 15min |
+| Áudios por minuto | 10 | 1 minuto | Ignorar (Telegram já limita) |
+| Comandos por minuto | 30 | 1 minuto | Ignorar |
 
 ---
 
@@ -183,109 +146,183 @@ def check_rate_limit(user_id: int, limit: int = 30, window_seconds: int = 60) ->
 
 | Evento | Dados logados | Nível |
 |--------|---------------|-------|
-| Comando recebido | Comando, user_hash, timestamp | INFO |
-| Erro de autenticação | user_hash, tentativas, timestamp | WARNING |
-| Erro de transcrição | trace_id, erro genérico | ERROR |
-| Despesa criada | expense_id, categoria (não valor) | INFO |
+| Login bem-sucedido | user_id, timestamp | INFO |
+| Login falhou | user_id, tentativa # | WARNING |
+| Conta bloqueada | user_id | WARNING |
+| Despesa criada | expense_id, user_id | INFO |
+| Erro de transcrição | error_code, audio_duration | ERROR |
+| Erro de API externa | service, status_code, latency | ERROR |
 
-### O que NUNCA logar
+### NUNCA logar
 
-| Dado | Motivo |
-|------|--------|
-| telegram_id | PII |
-| PIN (mesmo hash) | Segurança |
-| Valores financeiros | PII |
-| Transcrições completas | Privacidade |
-| API Keys | Segredo |
+- PIN (em nenhuma forma)
+- Valores de despesas
+- Conteúdo de transcrições
+- API Keys
+- Tokens
 
-### Implementação
+### Exemplo de Log Seguro
 
 ```python
 import structlog
-from hashlib import sha256
 
 logger = structlog.get_logger()
 
-def hash_user_id(telegram_id: int) -> str:
-    """Hash do telegram_id para logs"""
-    return sha256(str(telegram_id).encode()).hexdigest()[:16]
+# ✅ Correto
+logger.info("expense_created", expense_id=expense.id, user_id=user.id)
 
-# Uso
-logger.info(
-    "expense_created",
-    user_hash=hash_user_id(user_id),
-    expense_id=str(expense.id),
-    category=expense.category.name,  # OK: não é PII
-    # amount=expense.total_amount,   # NUNCA: é PII
-    trace_id=trace_id,
-)
+# ❌ Errado
+logger.info("expense_created", amount=expense.amount, description=expense.description)
 ```
 
 ---
 
 ## 8. Gestão de Segredos
 
-| Segredo | Onde armazenar | Rotação | Acesso |
-|---------|----------------|---------|--------|
-| TELEGRAM_BOT_TOKEN | .env | Manual (se comprometido) | App |
-| GROQ_API_KEY | .env | Manual | App |
-| GEMINI_API_KEY | .env | Manual | App |
-| DATABASE_URL | .env | N/A | App |
+### Variáveis de Ambiente
+
+| Variável | Obrigatória | Exemplo | Onde obter |
+|----------|-------------|---------|------------|
+| `TELEGRAM_BOT_TOKEN` | Sim | `123456:ABC-DEF...` | @BotFather |
+| `GROQ_API_KEY` | Sim | `gsk_...` | console.groq.com |
+| `GEMINI_API_KEY` | Sim | `AI...` | aistudio.google.com |
+| `DATABASE_URL` | Sim | `postgresql://user:pass@localhost/db` | Local |
 
 ### .env.example
 
-```env
+```bash
 # Telegram
 TELEGRAM_BOT_TOKEN=your_bot_token_here
 
-# APIs
-GROQ_API_KEY=your_groq_key_here
-GEMINI_API_KEY=your_gemini_key_here
+# AI APIs
+GROQ_API_KEY=your_groq_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/finance_bot
+DATABASE_URL=postgresql://finance:finance@localhost:5432/finance_bot
 
-# App
-APP_ENV=development
-DEBUG=false
+# Optional
+LOG_LEVEL=INFO
 ```
 
-### .gitignore
+### Regras
 
+- ✅ `.env` no `.gitignore`
+- ✅ `.env.example` com placeholders no repo
+- ✅ Permissões `600` no arquivo `.env`
+- ❌ Nunca commitar `.env` com valores reais
+- ❌ Nunca logar valores de variáveis de ambiente
+
+---
+
+## 9. Segurança do Docker
+
+### docker-compose.yml (Boas Práticas)
+
+```yaml
+version: "3.8"
+
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - db
+    networks:
+      - internal
+    # Não expor portas desnecessariamente
+    
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finance
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: finance_bot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    # Não expor porta 5432 ao host
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:
 ```
-.env
-.env.local
-*.pem
-*.key
+
+### Dockerfile (Boas Práticas)
+
+```dockerfile
+FROM python:3.13-slim
+
+# Não rodar como root
+RUN useradd -m -s /bin/bash app
+USER app
+
+WORKDIR /app
+
+COPY --chown=app:app requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY --chown=app:app src/ ./src/
+
+CMD ["python", "-m", "src.main"]
 ```
 
 ---
 
-## 9. Checklist de Segurança (PESSOAL)
+## 10. Recuperação de Acesso
+
+### Perfil PESSOAL: Reset Manual
+
+Como é single-user e local, reset é feito diretamente no banco:
+
+```bash
+# Conectar ao banco
+docker compose exec db psql -U finance -d finance_bot
+
+# Ver usuário
+SELECT id, telegram_id, locked_until, failed_attempts FROM users;
+
+# Desbloquear conta
+UPDATE users 
+SET locked_until = NULL, failed_attempts = 0 
+WHERE id = 1;
+
+# Resetar PIN (gerar novo hash via Python primeiro)
+# python -c "from passlib.hash import bcrypt; print(bcrypt.using(rounds=12).hash('123456'))"
+UPDATE users 
+SET pin_hash = '<novo_hash>' 
+WHERE id = 1;
+```
+
+---
+
+## 11. Checklist de Segurança
 
 ### Antes do Deploy
 
-- [ ] .env não está versionado
-- [ ] .gitignore inclui .env e secrets
-- [ ] PIN usa bcrypt cost=12
-- [ ] Sessão expira após 24h
-- [ ] Rate limiting básico implementado
-- [ ] Logs não contêm PII
-- [ ] SQLModel usado para queries (não SQL raw)
+- [ ] `.env` não está no git
+- [ ] `.env.example` existe com placeholders
+- [ ] Permissões do `.env` são `600`
+- [ ] Docker não expõe portas desnecessárias
+- [ ] Usuário do container não é root
+- [ ] Versões das libs estão fixadas
 
-### Manutenção
+### Durante Desenvolvimento
 
-- [ ] Rodar `pip audit` periodicamente
-- [ ] Atualizar dependências com vulnerabilidades
-- [ ] Rotacionar API keys se comprometidas
+- [ ] Validar telegram_id em todo handler
+- [ ] Usar SQLModel (nunca concatenar SQL)
+- [ ] Usar Pydantic para validação de input
+- [ ] Não logar dados sensíveis
+- [ ] Hash de PIN com bcrypt
 
----
+### Monitoramento
 
-## 10. Resposta a Incidentes (Simplificado)
-
-| Incidente | Ação |
-|-----------|------|
-| API Key exposta | Rotacionar imediatamente no provider |
-| Bot Token exposto | Revogar via @BotFather, criar novo |
-| Banco comprometido | Restaurar backup, resetar PINs |
-| Brute force detectado | Verificar logs, aumentar bloqueio |
+- [ ] Logs de erro configurados
+- [ ] Alertas para falhas de autenticação (opcional)

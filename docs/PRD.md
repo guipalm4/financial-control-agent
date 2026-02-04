@@ -25,9 +25,9 @@ Um agente via Telegram que recebe áudios de despesas, transcreve automaticament
 
 ### Objetivos (MVP)
 
-- [ ] Registrar despesas via áudio em &lt;10 segundos
-- [ ] Transcrever áudio com precisão &gt;95%
-- [ ] Categorizar automaticamente com precisão &gt;85%
+- [ ] Registrar despesas via áudio em <10 segundos
+- [ ] Transcrever áudio com precisão >95%
+- [ ] Categorizar automaticamente com precisão >85%
 - [ ] Aprender padrões do usuário para reduzir confirmações
 - [ ] Calcular corretamente vencimentos de cartão de crédito
 - [ ] Gerar resumo mensal por categoria
@@ -92,10 +92,12 @@ And responde:
 ```
 
 #### Regras de negócio
+
 - **RULE-007:** Bloqueio de conta após 3 tentativas de PIN (15 min)
 - **RULE-008:** Sessão expira após 24h de inatividade
 
 #### Testes associados
+
 - TEST-001: Criação de PIN válido (P0)
 - TEST-002: PIN formato inválido (P0)
 - TEST-003: Bloqueio após tentativas (P0)
@@ -134,14 +136,26 @@ Then o sistema responde:
   ❌ Digite apenas 4 dígitos numéricos (ex: 1234).
   code: CARD.INVALID_DIGITS
   """
+
+# TEST-012: Unhappy path - Dia de fechamento inválido
+Given um usuário autenticado cadastrando cartão
+When ele informa dia de fechamento "35"
+Then o sistema responde:
+  """
+  ❌ Dia de fechamento inválido. Digite um número entre 1 e 31.
+  code: CARD.INVALID_CLOSING_DAY
+  """
 ```
 
 #### Regras de negócio
+
 - **RULE-001:** Validação de cartão (closing_day 1-31, due_day 1-31, 4 dígitos numéricos)
 
 #### Testes associados
+
 - TEST-010: Cadastro de cartão válido (P0)
 - TEST-011: Cartão com dígitos inválidos (P1)
+- TEST-012: Dia de fechamento inválido (P1)
 
 ---
 
@@ -161,7 +175,7 @@ And extrai entidades via Gemini Flash:
   | campo | valor |
   | description | Uber |
   | amount | 30.00 |
-  | date | 2026-02-01 |
+  | date | 2026-02-03 |
   | category_suggestion | Transporte |
 And mostra resumo com botões [Confirmar] [Editar] [Cancelar]
 
@@ -184,16 +198,29 @@ Then o sistema extrai 2 despesas:
   | description | amount | is_essential |
   | Carne | 30.00 | true |
   | Cerveja | 20.00 | false |
+
+# TEST-023: Unhappy path - Áudio muito longo
+Given um usuário autenticado
+When ele envia áudio com duração > 60 segundos
+Then o sistema responde:
+  """
+  ❌ Áudio muito longo. Máximo permitido: 60 segundos.
+  code: AUDIO.TOO_LONG
+  """
+And NÃO processa o áudio
 ```
 
 #### Regras de negócio
+
 - **RULE-009:** Áudio deletado após 7 dias da transcrição
 - **RULE-010:** Fallback de transcrição só em erro/timeout do Groq
 
 #### Testes associados
+
 - TEST-020: Transcrição simples (P0)
 - TEST-021: Áudio não relacionado (P1)
 - TEST-022: Múltiplas despesas (P1)
+- TEST-023: Áudio muito longo (P1)
 
 ---
 
@@ -211,14 +238,24 @@ Then o sistema busca no histórico de categorização
 And encontra "uber" (normalizado) com count=3
 And sugere categoria "Transporte" com confiança 0.95
 And NÃO chama o LLM para categorização
+
+# TEST-031: Fallback para LLM
+Given um usuário sem histórico de "Spotify"
+When ele envia áudio "Gastei 30 reais no Spotify"
+Then o sistema NÃO encontra no histórico
+And chama Gemini Flash para categorização
+And sugere categoria "Assinaturas" com confiança via LLM
 ```
 
 #### Regras de negócio
+
 - **RULE-003:** Aprendizado: só sugerir categoria se confirmada >= 3 vezes
 - **RULE-005:** Normalização de descrição: lower(unaccent(trim()))
 
 #### Testes associados
+
 - TEST-030: Sugestão baseada em histórico (P1)
+- TEST-031: Fallback para LLM (P1)
 
 ---
 
@@ -229,14 +266,20 @@ And NÃO chama o LLM para categorização
 #### Critérios de aceite (Gherkin)
 
 ```gherkin
-# TEST-023: Interpretação de "ontem"
-Given a data atual é 2026-02-01 (sábado)
+# TEST-024: Interpretação de "ontem"
+Given a data atual é 2026-02-03 (segunda)
 When o sistema interpreta "gastei 50 reais ontem no mercado"
-Then a data extraída é 2026-01-31
-And a confirmação mostra "31/01/2026 (ontem)"
+Then a data extraída é 2026-02-02
+And a confirmação mostra "02/02/2026 (ontem)"
 
-# TEST-024: Rejeição de data futura
-Given a data atual é 2026-02-01
+# TEST-025: Interpretação de "sábado passado"
+Given a data atual é 2026-02-03 (segunda)
+When o sistema interpreta "gastei 100 reais no sábado"
+Then a data extraída é 2026-02-01
+And a confirmação mostra "01/02/2026 (sábado)"
+
+# TEST-026: Rejeição de data futura
+Given a data atual é 2026-02-03
 When o sistema interpreta "vou gastar amanhã"
 Then retorna erro:
   """
@@ -246,8 +289,10 @@ Then retorna erro:
 ```
 
 #### Testes associados
-- TEST-023: Interpretação de "ontem" (P0)
-- TEST-024: Data futura rejeitada (P1)
+
+- TEST-024: Interpretação de "ontem" (P0)
+- TEST-025: Interpretação de "sábado passado" (P1)
+- TEST-026: Data futura rejeitada (P1)
 
 ---
 
@@ -258,21 +303,39 @@ Then retorna erro:
 #### Critérios de aceite (Gherkin)
 
 ```gherkin
-# Happy path - Confiança alta (>= 0.9)
+# TEST-032: Happy path - Confiança alta (>= 0.9)
 Given uma despesa extraída com confiança 0.92
 When o sistema mostra o resumo
 Then exibe todos os campos com ✅
 And mostra botões [✅ Confirmar] [✏️ Editar] [❌ Cancelar]
 
-# Happy path - Confiança baixa (< 0.9)
+# TEST-033: Happy path - Confiança baixa (< 0.9)
 Given uma despesa extraída com confiança 0.75 no campo categoria
 When o sistema mostra o resumo
 Then destaca categoria com ❓
 And mostra botões específicos [Escolher Categoria]
+
+# TEST-034: Unhappy path - Timeout de confirmação
+Given uma despesa pendente de confirmação há 10 minutos
+When o usuário não responde
+Then o sistema cancela automaticamente
+And responde:
+  """
+  ⏱️ Tempo esgotado. Despesa não foi salva.
+  Envie o áudio novamente se quiser registrar.
+  code: EXPENSE.CONFIRMATION_TIMEOUT
+  """
 ```
 
 #### Regras de negócio
+
 - **RULE-006:** Confiança >= 0.9 permite confirmação direta
+
+#### Testes associados
+
+- TEST-032: Confirmação com confiança alta (P0)
+- TEST-033: Confirmação com confiança baixa (P1)
+- TEST-034: Timeout de confirmação (P2)
 
 ---
 
@@ -281,10 +344,13 @@ And mostra botões específicos [Escolher Categoria]
 **Como** usuário, **quero** que o bot diferencie gastos essenciais de não essenciais, **para** análise mais detalhada.
 
 #### Critérios de aceite
-- Alimentação básica (arroz, feijão) = Essencial
-- Alimentação supérflua (cerveja, restaurante) = Não Essencial
+
+- Alimentação básica (arroz, feijão, mercado) = Essencial
+- Alimentação supérflua (cerveja, restaurante, delivery) = Não Essencial
 - Transporte para trabalho = Essencial
 - Transporte para lazer = Não Essencial
+- Moradia (aluguel, contas) = Essencial
+- Assinaturas (streaming, apps) = Não Essencial
 
 ---
 
@@ -295,7 +361,15 @@ And mostra botões específicos [Escolher Categoria]
 #### Critérios de aceite (Gherkin)
 
 ```gherkin
-# TEST-042: Despesa parcelada em 3x
+# TEST-040: Despesa à vista (débito)
+Given um usuário com cartão de débito
+When ele confirma despesa de R$50,00 à vista em 03/02/2026
+Then o sistema cria 1 registro em `expenses` com total_amount=50.00
+And cria 1 registro em `entries` com:
+  | installment_number | amount | due_date | status |
+  | 1 | 50.00 | 2026-02-03 | pending |
+
+# TEST-041: Despesa parcelada em 3x
 Given um usuário com cartão Nubank (fechamento 10, vencimento 18)
 When ele confirma despesa de R$300,00 em 3x no crédito em 05/02/2026
 Then o sistema cria 1 registro em `expenses` com total_amount=300.00
@@ -307,10 +381,13 @@ And cria 3 registros em `entries`:
 ```
 
 #### Regras de negócio
+
 - **RULE-002:** State Machine de lançamento (pending → paid/cancelled)
 
 #### Testes associados
-- TEST-042: Parcelas distribuídas (P0)
+
+- TEST-040: Despesa à vista (P0)
+- TEST-041: Parcelas distribuídas (P0)
 
 ---
 
@@ -321,25 +398,34 @@ And cria 3 registros em `entries`:
 #### Critérios de aceite (Gherkin)
 
 ```gherkin
-# TEST-040: Compra antes do fechamento
+# TEST-042: Compra antes do fechamento
 Given um cartão com fechamento dia 22 e vencimento dia 5
 When uma despesa é criada em 21/01/2026 (antes do fechamento)
 Then o vencimento da 1ª parcela é 05/02/2026
 And a competência é "2026-02"
 
-# TEST-041: Compra após fechamento
+# TEST-043: Compra após fechamento
 Given um cartão com fechamento dia 22 e vencimento dia 5
 When uma despesa é criada em 23/01/2026 (após fechamento)
 Then o vencimento da 1ª parcela é 05/03/2026
 And a competência é "2026-03"
+
+# TEST-044: Fechamento no fim do mês
+Given um cartão com fechamento dia 28 e vencimento dia 10
+When uma despesa é criada em 30/01/2026
+Then o vencimento da 1ª parcela é 10/03/2026
+And a competência é "2026-03"
 ```
 
 #### Regras de negócio
+
 - **RULE-004:** Cálculo de vencimento baseado em fechamento
 
 #### Testes associados
-- TEST-040: Vencimento antes fechamento (P0)
-- TEST-041: Vencimento após fechamento (P0)
+
+- TEST-042: Vencimento antes fechamento (P0)
+- TEST-043: Vencimento após fechamento (P0)
+- TEST-044: Fechamento fim do mês (P1)
 
 ---
 
@@ -348,6 +434,7 @@ And a competência é "2026-03"
 **Como** usuário, **quero** gerenciar meus cartões (adicionar, editar, excluir), **para** manter dados atualizados.
 
 #### Comandos
+
 - `/add_cartao` — Adicionar novo cartão
 - `/list_cartoes` — Listar cartões cadastrados
 - `/edit_cartao <id>` — Editar cartão
@@ -360,6 +447,7 @@ And a competência é "2026-03"
 **Como** usuário, **quero** personalizar categorias, **para** adequar às minhas necessidades.
 
 #### Comandos
+
 - `/add_categoria <nome>` — Adicionar categoria
 - `/list_categorias` — Listar categorias
 - `/delete_categoria <id>` — Excluir categoria
@@ -381,12 +469,37 @@ Given um usuário com 3 despesas em Fevereiro/2026:
   | Cinema | 50.00 | Lazer | false |
 When ele executa /resumo
 Then o sistema calcula totais por categoria
-And mostra percentuais
-And mostra comparativo com mês anterior
+And mostra:
+  """
+  📊 Resumo Fevereiro/2026
+  
+  💰 Total: R$ 280,00
+  ✅ Essenciais: R$ 200,00 (71%)
+  ❌ Não essenciais: R$ 80,00 (29%)
+  
+  📁 Por categoria:
+  • Alimentação: R$ 200,00
+  • Lazer: R$ 50,00
+  • Transporte: R$ 30,00
+  """
+And mostra comparativo com mês anterior (se houver)
+
+# TEST-051: Resumo sem dados
+Given um usuário sem despesas em Março/2026
+When ele executa /resumo 03/2026
+Then o sistema responde:
+  """
+  📊 Resumo Março/2026
+  
+  Nenhuma despesa registrada neste mês.
+  code: REPORT.NO_DATA
+  """
 ```
 
 #### Testes associados
+
 - TEST-050: Geração de resumo mensal (P1)
+- TEST-051: Resumo sem dados (P2)
 
 ---
 
@@ -395,6 +508,7 @@ And mostra comparativo com mês anterior
 **Como** usuário, **quero** ver uma lista das últimas despesas, **para** conferir registros.
 
 #### Comandos
+
 - `/despesas` — Listar despesas do mês atual
 - `/despesas <mes>` — Listar despesas de um mês específico
 
@@ -467,8 +581,10 @@ graph LR
 | AUDIO.TRANSCRIPTION_FAILED | ERROR | Falha Groq + fallback | - | errors.audio.transcription |
 | EXPENSE.NOT_DETECTED | INFO | Sem despesa no áudio | - | errors.expense.not_detected |
 | EXPENSE.FUTURE_DATE | WARNING | Data futura | - | errors.expense.future_date |
+| EXPENSE.CONFIRMATION_TIMEOUT | INFO | Timeout de confirmação | - | errors.expense.timeout |
 | REPORT.INVALID_MONTH | WARNING | Mês inválido | - | errors.report.invalid_month |
 | REPORT.NO_DATA | INFO | Sem dados no período | - | errors.report.no_data |
+| ENTRY.INVALID_TRANSITION | ERROR | Transição de status inválida | - | errors.entry.invalid_transition |
 
 ---
 

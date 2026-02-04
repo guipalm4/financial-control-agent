@@ -6,61 +6,136 @@ alwaysApply: true
 # Project Context — Finance Bot Telegram
 
 ## Resumo
-Bot Telegram para registro de despesas pessoais via áudio com transcrição e categorização automática por IA.
 
-## Classificação
-- **Perfil:** PESSOAL
-- **Usuários:** Single-user (uso próprio)
-- **Exposição:** Local (Docker Compose)
-- **PII:** Dados financeiros básicos (valores, cartões, categorias)
+Bot Telegram para registro de despesas pessoais via áudio com transcrição automática (Groq Whisper) e categorização inteligente por IA (Gemini Flash). Objetivo: reduzir tempo de registro de 2 minutos para 10 segundos.
 
-## Stack
-| Componente | Tecnologia | Versão |
-|------------|------------|--------|
-| Runtime | Python | 3.11+ |
-| Framework | FastAPI | 0.109+ |
-| Bot | python-telegram-bot | 21+ |
-| Database | PostgreSQL | 16+ |
-| ORM | SQLModel | 0.0.14+ |
-| Migrations | Alembic | 1.13+ |
-| Transcrição | Groq Whisper Large | API |
-| LLM | Gemini Flash 2.0 | API |
+## Perfil
 
-## Estrutura de Diretórios
+- **Tipo:** PESSOAL (single-user, local)
+- **Meta de qualidade:** 95%+ de precisão em decisões
+- **Exposição:** Local (Docker Compose + ngrok)
+
+## Stack (VERSÕES FIXADAS - OBRIGATÓRIO SEGUIR)
+
+**ATENÇÃO:** As versões abaixo são OBRIGATÓRIAS. Antes de usar qualquer lib:
+1. Verificar se está listada aqui
+2. Se não estiver, consultar Context7 para versão compatível
+3. Registrar em learnings.md antes de usar
+
+| Componente | Tecnologia | Versão EXATA | Validação Context7 |
+|------------|------------|--------------|-------------------|
+| Runtime | Python | 3.13.x | ✅ Atualizado (LTS até 2029) |
+| Framework | FastAPI | 0.128.x | ✅ Consultado |
+| ORM | SQLModel | 0.0.24 | ✅ Consultado |
+| Banco | PostgreSQL | 16.x | ✅ Consultado |
+| Telegram | python-telegram-bot | 22.5 | ✅ Consultado |
+| Transcrição | Groq Python | latest | ✅ Consultado |
+| LLM | Google Generative AI | latest | - |
+| Validação | Pydantic | 2.7.x | (via FastAPI) |
+| Server | Uvicorn | 0.30.x | (via FastAPI) |
+| Migrations | Alembic | 1.13.x | - |
+
+**Anti-pattern:** NÃO usar versões diferentes sem atualizar esta tabela e registrar em ADR.
+
+### Verificação de compatibilidade
+
+Antes de `pip install`:
+1. Verificar se lib existe na tabela acima
+2. Se não existir, usar Context7 para verificar compatibilidade
+3. Adicionar à tabela após validação
+
+## Estrutura de diretórios
+
 ```
-src/
-├── main.py                    # FastAPI app entry
-├── config.py                  # Settings (pydantic-settings)
-├── database.py                # SQLModel engine/session
-├── features/
-│   ├── auth/                  # Autenticação (PIN, sessões)
-│   ├── expenses/              # Despesas e lançamentos
-│   ├── reports/               # Relatórios e resumos
-│   └── learning/              # Aprendizado de categorização
-├── integrations/
-│   ├── telegram/              # Bot handlers
-│   ├── groq.py                # Whisper client
-│   └── gemini.py              # Gemini client
-└── shared/                    # Utilitários compartilhados
+finance-bot/
+├── .cursor/
+│   └── rules/           # Regras do Cursor
+├── src/
+│   ├── api/             # Endpoints FastAPI (health, webhooks)
+│   ├── bot/             # Handlers do Telegram
+│   │   ├── handlers/    # Handlers por feature
+│   │   └── keyboards/   # Inline keyboards
+│   ├── services/        # Lógica de negócio
+│   │   ├── transcription/  # Groq Whisper
+│   │   ├── extraction/     # Gemini Flash
+│   │   └── learning/       # Aprendizado de padrões
+│   ├── models/          # SQLModel entities
+│   ├── db/              # Configuração do banco
+│   │   └── migrations/  # Alembic migrations
+│   └── core/            # Config, settings, utils
+├── tests/               # Testes
+│   ├── unit/
+│   └── integration/
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── .env.example
+└── README.md
 ```
 
-## Decisões Arquiteturais (ADRs)
-- **ADR-001:** PostgreSQL (não SQLite) para evolução futura
-- **ADR-002:** FastAPI Background Tasks (não Celery) por simplicidade
-- **ADR-003:** SQLModel para integração Pydantic + SQLAlchemy
-- **ADR-004:** Monolito Modular para separação de concerns
+## Workflow de Implementação (OBRIGATÓRIO)
 
-## IDs Rastreáveis
-| Prefixo | Significado |
-|---------|-------------|
-| FEAT-xxx | Feature/User Story |
-| RULE-xxx | Regra de negócio |
-| API-xxx | Comando/Handler |
-| TEST-xxx | Cenário de teste |
-| ADR-xxx | Decisão arquitetural |
+### Progress Tracker (FONTE DE VERDADE)
 
-## Documentação Relacionada
-- `PRD_v2.md` — Requisitos e user stories
-- `TECH_SPECS.md` — Especificação técnica
-- `ADR.md` — Decisões arquiteturais
-- `SECURITY_IMPLEMENTATION.md` — Segurança
+**SEMPRE** consultar `docs/PROGRESS.md` antes de iniciar qualquer task:
+1. Verificar dependências (não iniciar se dependência não está ✅ DONE)
+2. Usar branch name conforme definido no tracker
+3. Atualizar status: ⏳ → 🔄 → ✅
+
+### Git (NUNCA codar em main)
+
+1. Verificar PROGRESS.md para branch name correto
+2. Criar branch: `git checkout -b <branch-do-progress>`
+3. Commits convencionais: `feat:`, `fix:`, `chore:`
+4. Push e PR após DOD completo
+5. Atualizar PROGRESS.md para ✅ DONE
+
+### Antes de implementar QUALQUER task:
+
+1. **PROGRESS.md obrigatório:**
+   - Localizar task no Sprint correto
+   - Verificar dependências
+   - Atualizar para 🔄 IN_PROGRESS
+
+2. **PLAN mode obrigatório:**
+   - Usar Cursor Plan mode
+   - Listar arquivos que serão criados/modificados
+   - Identificar dependências
+   - Estimar complexidade
+
+3. **Clarification Questions se:**
+   - Contrato de API ambíguo
+   - Múltiplas formas de implementar
+   - Lib/versão não especificada
+   - Comportamento de erro não definido
+
+4. **Consultar Context7 ANTES de codar:**
+   - Para cada lib usada
+   - Validar sintaxe atual
+   - Registrar em learnings.md
+
+### Anti-patterns (PROIBIDO)
+
+- ❌ Pular direto para implementação sem Plan
+- ❌ Codar na branch main/master/develop
+- ❌ Assumir versão de lib sem consultar Context7
+- ❌ Marcar task como DONE sem executar DOD
+- ❌ Ignorar testes definidos no PRD
+- ❌ Iniciar task sem verificar PROGRESS.md
+- ❌ Iniciar task com dependência não concluída
+
+## Integrações Externas
+
+| Serviço | Uso | Timeout | Retries |
+|---------|-----|---------|---------|
+| Telegram Bot API | Webhook/Polling | 30s | 3 |
+| Groq Whisper | Transcrição de áudio | 60s | 2 |
+| Gemini Flash | Extração e categorização | 30s | 2 |
+
+## Referências
+
+- **PROGRESS.md** — Progress Tracker (fonte de verdade para tasks) — **CONSULTAR PRIMEIRO**
+- PRD.md — Requisitos e user stories
+- TECH_SPECS.md — Especificação técnica
+- SECURITY_IMPLEMENTATION.md — Segurança
+- ADR.md — Decisões arquiteturais

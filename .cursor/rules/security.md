@@ -1,76 +1,107 @@
 ---
-description: Regras de segurança do projeto
+description: Regras de segurança para Finance Bot Telegram
 alwaysApply: true
 ---
 
 # Security Rules — Finance Bot Telegram
 
-## Classificação de Dados
+## Perfil de Segurança
 
-| Dado | Classificação | Tratamento |
-|------|---------------|------------|
-| telegram_id | PII | Não logar |
-| PIN | Sensível | Hash bcrypt (cost=12) |
-| Valores financeiros | PII | Não logar em texto |
-| Áudios | Temporário | Deletar após 7 dias |
-| Transcrições | Interno | Não expor ao usuário |
+- **Classificação:** PESSOAL (single-user, local)
+- **Exposição:** Docker Compose + ngrok (local)
+- **Dados:** Financeiros pessoais (não-PII crítico, mas sensível)
 
-## Regras Inquebráveis
+## Dados Sensíveis
 
-### DEVE
-- [ ] Validar e sanitizar TODO input do usuário
-- [ ] Usar hash bcrypt (cost=12) para PIN
-- [ ] Implementar rate limiting básico (anti-loop)
-- [ ] Logar erros sem PII/secrets
-- [ ] Usar HTTPS para webhook do Telegram
+| Dado | Classificação | Onde armazenar | Criptografia |
+|------|---------------|----------------|--------------|
+| PIN do usuário | Sensível | DB (hash bcrypt) | bcrypt cost=12 |
+| Telegram User ID | Identificador | DB | - |
+| Dados financeiros | Pessoal | DB | - |
+| API Keys (Groq, Gemini) | Segredo | .env (nunca no repo) | - |
+| Bot Token | Segredo | .env (nunca no repo) | - |
 
-### NÃO DEVE
-- [ ] Logar valores financeiros em texto
-- [ ] Armazenar PIN em texto
-- [ ] Expor tracebacks ao usuário
-- [ ] Concatenar strings em queries SQL
-- [ ] Armazenar secrets no código
+## Regras Obrigatórias
 
-## Autenticação
+### Autenticação
 
-### PIN
-- **Formato:** 4-6 dígitos numéricos
-- **Hash:** bcrypt, cost=12
-- **Bloqueio:** 3 tentativas → 15 minutos
-- **Sessão:** Expira após 24h de inatividade
+- **DEVE** usar PIN de 4-6 dígitos para ativar o bot
+- **DEVE** hashear PIN com bcrypt (cost=12)
+- **DEVE** bloquear conta após 3 tentativas erradas (15 min)
+- **DEVE** expirar sessão após 24h de inatividade
+- **NÃO DEVE** armazenar PIN em texto plano
 
-### Recuperação
-- **Método:** Reset manual no banco (perfil PESSOAL)
-- **Procedimento:** `UPDATE users SET pin_hash = NULL WHERE id = 'xxx'`
+### Segredos
 
-## Rate Limiting (Básico)
+- **DEVE** usar variáveis de ambiente para segredos
+- **DEVE** ter `.env.example` sem valores reais
+- **NÃO DEVE** commitar `.env` no repositório
+- **NÃO DEVE** logar API keys ou tokens
 
-| Contexto | Limite | Ação |
-|----------|--------|------|
-| Tentativas PIN | 3/15min | Bloquear conta |
-| Mensagens/minuto | 30/min | Ignorar excedentes |
+### Validação de Input
+
+- **DEVE** validar todo input do usuário (Pydantic)
+- **DEVE** sanitizar input antes de processar
+- **DEVE** rejeitar payloads muito grandes (áudio > 60s)
+- **NÃO DEVE** concatenar strings em queries SQL
+
+### Telegram
+
+- **DEVE** validar que mensagens vêm do usuário autorizado
+- **DEVE** usar apenas o Telegram User ID cadastrado
+- **NÃO DEVE** responder a usuários não autorizados
+
+### Áudio
+
+- **DEVE** deletar arquivos de áudio após 7 dias
+- **DEVE** validar formato de áudio antes de processar
+- **NÃO DEVE** armazenar áudio indefinidamente
+
+## Ações Proibidas (Anti-patterns)
+
+- ❌ Armazenar segredos no código
+- ❌ Logar dados financeiros completos
+- ❌ Aceitar input sem validação
+- ❌ Usar SQL concatenado
+- ❌ Responder a qualquer usuário do Telegram
+- ❌ Expor endpoints sem autenticação
+
+## Checkpoints com Aprovação Humana
+
+| Operação | Requer aprovação | Motivo |
+|----------|------------------|--------|
+| Deletar despesas em massa | Sim | Irreversível |
+| Resetar PIN | Sim | Segurança |
+| Exportar dados | Não | Dados pessoais |
+| Backup do banco | Não | Automático |
+
+## Logging Seguro
+
+| Evento | Logar | NUNCA logar |
+|--------|-------|-------------|
+| Login/PIN check | user_id, success, timestamp | PIN |
+| Despesa criada | expense_id, user_id | Valores financeiros |
+| Erro de transcrição | error_code, audio_duration | Conteúdo do áudio |
+| Chamada API externa | service, latency, status | API keys |
 
 ## Gestão de Segredos
 
-| Segredo | Onde | Rotação |
-|---------|------|---------|
-| TELEGRAM_BOT_TOKEN | .env | Manual |
-| GROQ_API_KEY | .env | Manual |
-| GEMINI_API_KEY | .env | Manual |
-| DATABASE_URL | .env | N/A |
+| Segredo | Variável de ambiente | Obrigatório |
+|---------|---------------------|-------------|
+| Bot Token | `TELEGRAM_BOT_TOKEN` | Sim |
+| Groq API Key | `GROQ_API_KEY` | Sim |
+| Gemini API Key | `GEMINI_API_KEY` | Sim |
+| Database URL | `DATABASE_URL` | Sim |
+| PIN Salt (opcional) | `PIN_SALT` | Não (bcrypt gera) |
 
-## Checkpoints (Aprovação Humana)
+## Recuperação de Acesso
 
-| Ação | Checkpoint |
-|------|------------|
-| Deletar cartão | Confirmação no bot |
-| Excluir despesa | Confirmação no bot |
-| Reset de PIN | Acesso direto ao banco |
+**Perfil PESSOAL:** Reset manual no banco de dados
 
-## OWASP Top 10 (Aplicável)
+```sql
+-- Reset PIN (gerar novo hash via Python)
+UPDATE users SET pin_hash = '<novo_hash>' WHERE telegram_id = <seu_id>;
 
-| # | Vulnerabilidade | Mitigação |
-|---|-----------------|-----------|
-| A01 | Broken Access Control | Validar telegram_id em cada request |
-| A03 | Injection | SQLModel ORM (queries parametrizadas) |
-| A07 | Auth Failures | PIN com hash, bloqueio após tentativas |
+-- Desbloquear conta
+UPDATE users SET locked_until = NULL, failed_attempts = 0 WHERE telegram_id = <seu_id>;
+```
