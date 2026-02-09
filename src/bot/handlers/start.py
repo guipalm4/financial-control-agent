@@ -7,6 +7,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from src.db.engine import engine
+from src.db.seed import seed_default_categories
 from src.models import User
 from src.services.auth import hash_pin
 
@@ -100,8 +101,12 @@ async def confirm_pin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         stmt = select(User).where(User.telegram_id == user.id)
         existing = session.exec(stmt).first()
         if existing is None:
-            session.add(User(telegram_id=user.id, pin_hash=pin_hash))
+            new_user = User(telegram_id=user.id, pin_hash=pin_hash)
+            session.add(new_user)
             session.commit()
+            session.refresh(new_user)
+            if new_user.id is not None:
+                seed_default_categories(session, new_user.id)
 
     user_data.pop("pending_pin", None)
     await message.reply_text("✅ PIN criado! Vamos configurar seus cartões.")
