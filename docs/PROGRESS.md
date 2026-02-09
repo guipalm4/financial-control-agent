@@ -120,7 +120,7 @@ graph TD
 
 | ID | Task | Status | Branch | Dependência | DOD |
 |----|------|--------|--------|-------------|-----|
-| AUTH-001 | Modelo User + migration + hash bcrypt (cost=12) | 🔄 | `feat/FEAT-001-user-model` | INFRA-002 | [ ] |
+| AUTH-001 | Modelo User + migration + hash bcrypt (cost=12) | ✅ | `feat/FEAT-001-user-model` | INFRA-002 | [x] |
 | AUTH-002 | Handler /start: novo usuário → criação PIN (ConversationHandler) | ⏳ | `feat/FEAT-001-start-handler` | AUTH-001 | [ ] |
 | AUTH-003 | Handler login: usuário existente + bloqueio (3 tentativas, 15min) + sessão (24h) | ⏳ | `feat/FEAT-001-login-handler` | AUTH-001 | [ ] |
 
@@ -524,14 +524,14 @@ graph TD
 | Sprint | Total Tasks | Done | Progress |
 |--------|-------------|------|----------|
 | Sprint 0: Infra | 3 | 3 | 100% |
-| Sprint 1: Auth | 3 | 0 | 0% |
+| Sprint 1: Auth | 3 | 1 | 33% |
 | Sprint 2: Onboarding | 4 | 0 | 0% |
 | Sprint 3: Core Audio | 4 | 0 | 0% |
 | Sprint 4: Categorização | 3 | 0 | 0% |
 | Sprint 5: Financeiro | 3 | 0 | 0% |
 | Sprint 6: Relatórios | 3 | 0 | 0% |
 | Sprint 7: Observabilidade | 3 | 0 | 0% |
-| **TOTAL** | **26** | **3** | **12%** |
+| **TOTAL** | **26** | **4** | **15%** |
 
 ### Por Prioridade de Testes
 
@@ -548,6 +548,7 @@ graph TD
 
 | Data | Sprint | Task | De | Para | Notas |
 |------|--------|------|----|------|-------|
+| 2026-02-09 | Sprint 1: Autenticação | AUTH-001 | 🔄 | ✅ | DOD completo |
 | 2026-02-09 | Sprint 1: Autenticação | AUTH-001 | ⏳ | 🔄 | Iniciando: Modelo User + migration + hash bcrypt (cost=12) |
 | 2026-02-09 | Sprint 0: Infra | INFRA-003 | 🔄 | ✅ | DOD completo |
 | 2026-02-09 | Sprint 0: Infra | INFRA-003 | ⏳ | 🔄 | Iniciando: Configurar ruff + mypy |
