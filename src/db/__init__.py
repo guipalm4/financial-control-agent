@@ -1,4 +1,5 @@
 """Database module."""
+
 from src.db.engine import create_db_and_tables, engine
 from src.db.session import get_session
 

@@ -1,9 +1,11 @@
 """Main Telegram bot application."""
+
 import logging
+
 from telegram.ext import Application, CommandHandler
 
-from src.core.config import settings
 from src.bot.handlers.start import start_handler
+from src.core.config import settings
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",

@@ -1,4 +1,5 @@
 """Database engine configuration for SQLModel."""
+
 from sqlmodel import SQLModel, create_engine
 
 from src.core.config import settings

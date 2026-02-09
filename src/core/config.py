@@ -1,5 +1,4 @@
 """Configuration settings for the application."""
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,8 +13,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@postgres:5432/finance_bot"
 
     # API Keys
-    GROQ_API_KEY: Optional[str] = None
-    GOOGLE_API_KEY: Optional[str] = None
+    GROQ_API_KEY: str | None = None
+    GOOGLE_API_KEY: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -24,4 +23,5 @@ class Settings(BaseSettings):
     )
 
 
-settings = Settings()
+# Loaded from env at runtime; mypy does not understand pydantic-settings injection
+settings: Settings = Settings()  # type: ignore[call-arg]

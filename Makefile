@@ -1,4 +1,4 @@
-.PHONY: help install up down logs test migrate migrate-create shell clean
+.PHONY: help install up down logs test lint typecheck migrate migrate-create shell clean
 
 # Default target
 help:
@@ -9,6 +9,8 @@ help:
 	@echo "  make down         - Parar containers (docker compose down)"
 	@echo "  make logs         - Ver logs do bot"
 	@echo "  make test         - Executar testes"
+	@echo "  make lint         - Lint e formatação (ruff check . && ruff format . --check)"
+	@echo "  make typecheck    - Verificação de tipos (mypy .)"
 	@echo "  make migrate      - Aplicar migrations (alembic upgrade head)"
 	@echo "  make migrate-create - Criar nova migration (use: make migrate-create MESSAGE='descrição')"
 	@echo "  make shell        - Abrir shell no container do bot"
@@ -35,6 +37,13 @@ logs:
 # Testes
 test:
 	uv run pytest tests/ -v
+
+# Qualidade: lint e tipos (DOD INFRA-003)
+lint:
+	uv run ruff check . && uv run ruff format . --check
+
+typecheck:
+	uv run mypy .
 
 # Migrations
 migrate:
