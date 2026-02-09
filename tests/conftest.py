@@ -4,7 +4,7 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
 from src.bot.app import create_app
-from src.models import User  # noqa: F401 - register model for metadata
+from src.models import Card, Category, User  # noqa: F401 - register models for metadata
 
 
 @pytest.fixture(scope="function")
