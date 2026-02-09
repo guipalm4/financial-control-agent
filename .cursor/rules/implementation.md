@@ -87,6 +87,11 @@ make lint && make test && docker compose up -d
 git push -u origin feat/FEAT-xxx-descricao
 ```
 
+### Commit e abertura de PR
+
+- **Template de PR:** Ao criar um pull request, usar e preencher o template em `.github/PULL_REQUEST_TEMPLATE.md` (Task, Branch, Sprint, Alterações, checklist DOD).
+- **Skill pr-workflow:** Quando o usuário pedir para "commitar e abrir o PR" (ou só "abrir o PR"), seguir a skill em `.cursor/skills/pr-workflow/SKILL.md`: commit com mensagem convencional, push, criar PR com body preenchido a partir do template.
+
 ### Anti-patterns (PROIBIDO)
 
 - ❌ Codar na branch main/master/develop
@@ -239,6 +244,10 @@ Para implementar FEAT-xxx:
 - @TECH_SPECS.md (API-xxx, modelo de dados)
 - @SECURITY_IMPLEMENTATION.md (requisitos de segurança)
 - @ADR.md (decisões arquiteturais)
+
+Para commit e PR:
+- **@.github/PULL_REQUEST_TEMPLATE.md** — preencher ao abrir PR
+- **@.cursor/skills/pr-workflow/SKILL.md** — fluxo ao pedir "commitar e abrir o PR"
 
 ---
 
