@@ -66,7 +66,7 @@ graph TD
 
 ---
 
-## Sprint 0: Infraestrutura ⏳
+## Sprint 0: Infraestrutura ✅
 
 **Objetivo:** Setup inicial do projeto, ambiente de desenvolvimento funcional.
 
@@ -78,7 +78,7 @@ graph TD
 |----|------|--------|--------|-------------|-----|
 | INFRA-001 | Setup projeto completo: estrutura de diretórios, Docker Compose (bot + postgres), python-telegram-bot básico, .env.example | ✅ | `chore/infra-completa` | - | [x] |
 | INFRA-002 | Configurar SQLModel + Alembic + pytest com fixtures | ✅ | `chore/database-testing` | INFRA-001 | [x] |
-| INFRA-003 | Configurar ferramentas de qualidade: ruff + mypy | ⏳ | `chore/linting-setup` | INFRA-001 | [ ] |
+| INFRA-003 | Configurar ferramentas de qualidade: ruff + mypy | ✅ | `chore/linting-setup` | INFRA-001 | [x] |
 
 **Detalhamento INFRA-001:**
 - Criar estrutura de diretórios (src/, tests/, migrations/, etc.)
@@ -101,7 +101,7 @@ graph TD
 
 - [x] `docker compose up -d` sobe bot + postgres sem erros
 - [x] `pytest tests/` executa (mesmo sem testes reais)
-- [ ] `ruff check . && mypy .` passa
+- [x] `ruff check . && mypy .` passa
 - [x] Bot responde a /start com mensagem placeholder
 
 ---
@@ -523,7 +523,7 @@ graph TD
 
 | Sprint | Total Tasks | Done | Progress |
 |--------|-------------|------|----------|
-| Sprint 0: Infra | 3 | 2 | 67% |
+| Sprint 0: Infra | 3 | 3 | 100% |
 | Sprint 1: Auth | 3 | 0 | 0% |
 | Sprint 2: Onboarding | 4 | 0 | 0% |
 | Sprint 3: Core Audio | 4 | 0 | 0% |
@@ -531,7 +531,7 @@ graph TD
 | Sprint 5: Financeiro | 3 | 0 | 0% |
 | Sprint 6: Relatórios | 3 | 0 | 0% |
 | Sprint 7: Observabilidade | 3 | 0 | 0% |
-| **TOTAL** | **26** | **2** | **8%** |
+| **TOTAL** | **26** | **3** | **12%** |
 
 ### Por Prioridade de Testes
 
@@ -548,6 +548,8 @@ graph TD
 
 | Data | Sprint | Task | De | Para | Notas |
 |------|--------|------|----|------|-------|
+| 2026-02-09 | Sprint 0: Infra | INFRA-003 | 🔄 | ✅ | DOD completo |
+| 2026-02-09 | Sprint 0: Infra | INFRA-003 | ⏳ | 🔄 | Iniciando: Configurar ruff + mypy |
 | 2026-02-09 | Sprint 0: Infra | INFRA-002 | 🔄 | ✅ | DOD completo |
 | 2026-02-09 | Sprint 0: Infra | INFRA-002 | ⏳ | 🔄 | Iniciando: Configurar SQLModel + Alembic + pytest |
 | 2026-02-09 | Sprint 0: Infra | INFRA-001 | 🔄 | ✅ | DOD completo |

@@ -1,7 +1,6 @@
 """Example integration tests."""
-import pytest
 
-from tests.conftest import db_session, bot_app_async
+import pytest
 
 
 @pytest.mark.integration

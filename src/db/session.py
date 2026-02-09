@@ -1,12 +1,13 @@
 """Database session management."""
-from typing import Generator
+
+from collections.abc import Iterator
 
 from sqlmodel import Session
 
 from src.db.engine import engine
 
 
-def get_session() -> Generator[Session, None, None]:
+def get_session() -> Iterator[Session]:
     """Get a database session.
 
     Yields:

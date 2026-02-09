@@ -1,7 +1,4 @@
 """Example unit tests."""
-import pytest
-
-from tests.conftest import db_session, bot_app
 
 
 def test_example_unit():

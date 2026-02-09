@@ -1,13 +1,13 @@
 """Alembic environment configuration."""
+
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
-from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # Import SQLModel metadata
 from sqlmodel import SQLModel
+
+from alembic import context
 
 # Import all models here so Alembic can detect them
 # This will be populated as models are created
