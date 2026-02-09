@@ -273,3 +273,54 @@ Estratégia híbrida:
 
 **Riscos:**
 - Perda de contexto em caso de erro (mitigado: log de erro com detalhes)
+
+---
+
+## ADR-008: Gerenciador de Pacotes uv
+
+**Status:** Aceito  
+**Data:** 2026-02-09  
+**Decisores:** Desenvolvedor
+
+### Contexto
+
+O projeto inicialmente usava `pip` e `requirements.txt` para gerenciar dependências Python. Com o crescimento do projeto e necessidade de builds reproduzíveis, surge a necessidade de um gerenciador de pacotes mais moderno e eficiente.
+
+### Decisão
+
+Migrar para **uv** como gerenciador de pacotes Python, usando `pyproject.toml` como fonte única de verdade para dependências e `uv.lock` para builds reproduzíveis.
+
+### Alternativas consideradas
+
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **uv** | Extremamente rápido, drop-in replacement para pip, suporta pyproject.toml, lockfile nativo | Relativamente novo (mas estável) |
+| Poetry | Maduro, ecossistema grande | Mais lento que uv, overhead maior |
+| pip-tools | Compatível com pip | Requer workflow adicional, não integrado |
+| pip + requirements.txt | Simples, familiar | Lento, sem lockfile nativo, duplicação com pyproject.toml |
+
+### Consequências
+
+**Ganhos:**
+- Instalação de dependências 10-100x mais rápida que pip
+- Builds reproduzíveis com `uv.lock`
+- Fonte única de verdade: `pyproject.toml` (sem duplicação com requirements.txt)
+- Compatível com PEP 621 (pyproject.toml)
+- Drop-in replacement: `uv pip install` funciona como `pip install`
+- Melhor integração com Docker (menor tempo de build)
+
+**Perdas:**
+- Requer instalação do uv (mas é simples: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- Equipe precisa aprender comandos do uv (mas são intuitivos)
+
+**Riscos:**
+- Ferramenta relativamente nova (mitigado: mantida pela Astral, mesma equipe do ruff, amplamente adotada)
+- Migração inicial requer atualização de documentação (mitigado: documentação atualizada)
+
+### Implementação
+
+- Dependências migradas de `requirements.txt` para `pyproject.toml`
+- `uv.lock` gerado e commitado no repositório
+- Dockerfile atualizado para usar uv
+- Makefile atualizado com comandos `uv sync` e `uv run`
+- Documentação atualizada (README, TESTING.md, project-context.md)

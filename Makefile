@@ -3,7 +3,8 @@
 # Default target
 help:
 	@echo "Comandos disponíveis:"
-	@echo "  make install      - Instalar dependências Python"
+	@echo "  make install      - Instalar dependências Python (uv sync)"
+	@echo "  make lock         - Gerar/atualizar uv.lock"
 	@echo "  make up           - Subir containers (docker compose up -d)"
 	@echo "  make down         - Parar containers (docker compose down)"
 	@echo "  make logs         - Ver logs do bot"
@@ -15,7 +16,11 @@ help:
 
 # Instalar dependências
 install:
-	pip install -r requirements.txt
+	uv sync
+
+# Gerar/atualizar lockfile
+lock:
+	uv lock
 
 # Docker Compose
 up:
@@ -29,7 +34,7 @@ logs:
 
 # Testes
 test:
-	pytest tests/ -v
+	uv run pytest tests/ -v
 
 # Migrations
 migrate:

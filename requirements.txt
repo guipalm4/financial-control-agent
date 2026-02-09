@@ -1,3 +1,8 @@
+# DEPRECATED: Este arquivo está mantido apenas para referência.
+# O projeto agora usa uv com pyproject.toml como fonte única de verdade.
+# Para instalar dependências, use: uv sync
+# Para adicionar uma dependência, use: uv add <pacote>
+#
 # Telegram Bot
 python-telegram-bot==22.5
 

@@ -2,12 +2,20 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies using uv
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
 COPY src/ ./src/
+
+# Use Python from uv's managed environment
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Run the bot
 CMD ["python", "-m", "src.main"]
