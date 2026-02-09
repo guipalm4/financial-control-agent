@@ -2,9 +2,22 @@
 
 import logging
 
-from telegram.ext import Application, CommandHandler
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
-from src.bot.handlers.start import start_handler
+from src.bot.handlers.start import (
+    ASK_PIN,
+    CONFIRM_PIN,
+    ask_pin,
+    cancel,
+    confirm_pin,
+    start_handler,
+)
 from src.core.config import settings
 
 logging.basicConfig(
@@ -18,8 +31,16 @@ def create_app() -> Application:
     """Create and configure the Telegram bot application."""
     application = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
-    # Register command handlers
-    application.add_handler(CommandHandler("start", start_handler))
+    # /start: new user -> PIN creation (ConversationHandler)
+    start_conv = ConversationHandler(
+        entry_points=[CommandHandler("start", start_handler)],
+        states={
+            ASK_PIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_pin)],
+            CONFIRM_PIN: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_pin)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+    application.add_handler(start_conv)
 
     return application
 
