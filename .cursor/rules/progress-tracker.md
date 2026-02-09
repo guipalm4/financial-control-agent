@@ -30,7 +30,12 @@ Resumo: Status 🔄 → ✅, DOD [x], atualizar Resumo de Progresso e Histórico
 ## Onde estão os fluxos
 
 - **Skill (passo a passo):** `.cursor/skills/progress-tracker/SKILL.md`
-- **Comandos no chat:** digite `/` e escolha `progress-start-task` ou `progress-finish-task`
+- **Comandos no chat:** digite `/` e escolha:
+  - `progress-start-task` — marcar task como iniciada
+  - `progress-finish-task` — marcar task como concluída
+  - `resume-work` — retomar contexto (tasks em progresso, próxima task)
+  - `next-task` — sugerir próxima task a iniciar
+  - `validate-dod` — validar DOD antes de marcar DONE
 
 ## Anti-pattern (PROIBIDO)
 
