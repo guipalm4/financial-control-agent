@@ -106,7 +106,7 @@ graph TD
 
 ---
 
-## Sprint 1: Autenticação (FEAT-001) ⏳
+## Sprint 1: Autenticação (FEAT-001) ✅
 
 **Objetivo:** Usuário pode criar PIN e autenticar-se.
 
@@ -122,7 +122,7 @@ graph TD
 |----|------|--------|--------|-------------|-----|
 | AUTH-001 | Modelo User + migration + hash bcrypt (cost=12) | ✅ | `feat/FEAT-001-user-model` | INFRA-002 | [x] |
 | AUTH-002 | Handler /start: novo usuário → criação PIN (ConversationHandler) | ✅ | `feat/FEAT-001-start-handler` | AUTH-001 | [x] |
-| AUTH-003 | Handler login: usuário existente + bloqueio (3 tentativas, 15min) + sessão (24h) | ⏳ | `feat/FEAT-001-login-handler` | AUTH-001 | [ ] |
+| AUTH-003 | Handler login: usuário existente + bloqueio (3 tentativas, 15min) + sessão (24h) | ✅ | `feat/FEAT-001-login-handler` | AUTH-001 | [x] |
 
 **Detalhamento AUTH-001:**
 - Criar modelo User (SQLModel) com campos: id, telegram_id, pin_hash, failed_attempts, locked_until, last_login
@@ -147,15 +147,15 @@ graph TD
 |---------|---------|------------|--------|-----------------|
 | TEST-001 | Criação de PIN válido | P0 | ⏳ | AUTH-002 |
 | TEST-002 | PIN formato inválido | P0 | ⏳ | AUTH-002 |
-| TEST-003 | Bloqueio após tentativas | P0 | ⏳ | AUTH-003 |
+| TEST-003 | Bloqueio após tentativas | P0 | ✅ | AUTH-003 |
 
 ### Critérios de Saída Sprint 1
 
 - [ ] Novo usuário consegue criar PIN
-- [ ] Usuário existente faz login com PIN
-- [ ] Conta bloqueia após 3 erros
+- [x] Usuário existente faz login com PIN
+- [x] Conta bloqueia após 3 erros
 - [ ] Todos os TEST-00X passam
-- [ ] Códigos de erro AUTH.* funcionam
+- [x] Códigos de erro AUTH.* funcionam
 
 ---
 
@@ -524,14 +524,14 @@ graph TD
 | Sprint | Total Tasks | Done | Progress |
 |--------|-------------|------|----------|
 | Sprint 0: Infra | 3 | 3 | 100% |
-| Sprint 1: Auth | 3 | 2 | 67% |
+| Sprint 1: Auth | 3 | 3 | 100% |
 | Sprint 2: Onboarding | 4 | 0 | 0% |
 | Sprint 3: Core Audio | 4 | 0 | 0% |
 | Sprint 4: Categorização | 3 | 0 | 0% |
 | Sprint 5: Financeiro | 3 | 0 | 0% |
 | Sprint 6: Relatórios | 3 | 0 | 0% |
 | Sprint 7: Observabilidade | 3 | 0 | 0% |
-| **TOTAL** | **26** | **5** | **19%** |
+| **TOTAL** | **26** | **6** | **23%** |
 
 ### Por Prioridade de Testes
 
@@ -548,6 +548,8 @@ graph TD
 
 | Data | Sprint | Task | De | Para | Notas |
 |------|--------|------|----|------|-------|
+| 2026-02-09 | Sprint 1: Autenticação | AUTH-003 | 🔄 | ✅ | DOD completo |
+| 2026-02-09 | Sprint 1: Autenticação | AUTH-003 | ⏳ | 🔄 | Iniciando: Handler login + bloqueio + sessão 24h |
 | 2026-02-09 | Sprint 1: Autenticação | AUTH-002 | 🔄 | ✅ | DOD completo (marcação retroativa) |
 | 2026-02-09 | Sprint 1: Autenticação | AUTH-002 | ⏳ | 🔄 | Iniciando: Handler /start (ConversationHandler) para criação de PIN |
 | 2026-02-09 | Sprint 1: Autenticação | AUTH-001 | 🔄 | ✅ | DOD completo |
