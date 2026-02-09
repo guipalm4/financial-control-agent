@@ -1,0 +1,18 @@
+# Telegram Bot
+python-telegram-bot==22.5
+
+# Configuration
+pydantic-settings==2.7.0
+
+# Database (will be used in INFRA-002)
+# sqlmodel==0.0.24
+# alembic==1.13.0
+# psycopg2-binary==2.9.10
+
+# Testing (will be used in INFRA-002)
+# pytest==8.3.4
+# pytest-asyncio==0.24.0
+
+# Code quality (will be used in INFRA-003)
+# ruff==0.8.4
+# mypy==1.13.0
