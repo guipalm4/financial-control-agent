@@ -10,6 +10,12 @@ from telegram.ext import (
     filters,
 )
 
+from src.bot.handlers.login import (
+    ASK_LOGIN_PIN,
+    login_ask_pin,
+    login_cancel,
+    login_handler,
+)
 from src.bot.handlers.start import (
     ASK_PIN,
     CONFIRM_PIN,
@@ -41,6 +47,20 @@ def create_app() -> Application:
         fallbacks=[CommandHandler("cancel", cancel)],
     )
     application.add_handler(start_conv)
+
+    login_conv = ConversationHandler(
+        entry_points=[CommandHandler("login", login_handler)],
+        states={
+            ASK_LOGIN_PIN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, login_ask_pin),
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", login_cancel),
+            CommandHandler("login", login_handler),
+        ],
+    )
+    application.add_handler(login_conv)
 
     return application
 
