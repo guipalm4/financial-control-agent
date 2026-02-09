@@ -1,9 +1,7 @@
 ---
-description: Regras de segurança para Finance Bot Telegram. Aplica ao editar código em src/.
+description: Regras de segurança para Finance Bot Telegram. Aplica ao implementar alguma feature relacionada a segurança.
 alwaysApply: false
-globs: ["src/**"]
 ---
-
 # Security Rules — Finance Bot Telegram
 
 ## Perfil de Segurança

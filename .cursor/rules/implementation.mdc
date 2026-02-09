@@ -1,9 +1,6 @@
 ---
-description: Workflow de implementação — Git, DOD, Clarification, Progress Tracker, Métricas (95%+ precisão). Aplica ao editar código ou testes.
-alwaysApply: false
-globs: ["src/**", "tests/**"]
+alwaysApply: true
 ---
-
 # Workflow de Implementação — Finance Bot Telegram
 
 **Meta de qualidade:** 95%+ de precisão em decisões (sem retrabalho).
