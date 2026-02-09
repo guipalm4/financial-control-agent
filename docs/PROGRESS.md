@@ -120,7 +120,7 @@ graph TD
 
 | ID | Task | Status | Branch | Dependência | DOD |
 |----|------|--------|--------|-------------|-----|
-| AUTH-001 | Modelo User + migration + hash bcrypt (cost=12) | ⏳ | `feat/FEAT-001-user-model` | INFRA-002 | [ ] |
+| AUTH-001 | Modelo User + migration + hash bcrypt (cost=12) | 🔄 | `feat/FEAT-001-user-model` | INFRA-002 | [ ] |
 | AUTH-002 | Handler /start: novo usuário → criação PIN (ConversationHandler) | ⏳ | `feat/FEAT-001-start-handler` | AUTH-001 | [ ] |
 | AUTH-003 | Handler login: usuário existente + bloqueio (3 tentativas, 15min) + sessão (24h) | ⏳ | `feat/FEAT-001-login-handler` | AUTH-001 | [ ] |
 
@@ -548,6 +548,7 @@ graph TD
 
 | Data | Sprint | Task | De | Para | Notas |
 |------|--------|------|----|------|-------|
+| 2026-02-09 | Sprint 1: Autenticação | AUTH-001 | ⏳ | 🔄 | Iniciando: Modelo User + migration + hash bcrypt (cost=12) |
 | 2026-02-09 | Sprint 0: Infra | INFRA-003 | 🔄 | ✅ | DOD completo |
 | 2026-02-09 | Sprint 0: Infra | INFRA-003 | ⏳ | 🔄 | Iniciando: Configurar ruff + mypy |
 | 2026-02-09 | Sprint 0: Infra | INFRA-002 | 🔄 | ✅ | DOD completo |

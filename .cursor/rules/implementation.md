@@ -22,6 +22,7 @@ globs: ["src/**", "tests/**"]
 4. **Se dependência não está ✅ DONE → NÃO INICIAR**
 5. Atualizar status para 🔄 IN_PROGRESS
 6. Registrar na tabela "Histórico de Atualizações"
+7. **CRIAR BRANCH (obrigatório antes de qualquer edição):** `git checkout -b <branch>` usando a coluna **Branch** da task. Se já estiver em main/master/develop, NUNCA editar código antes de criar e trocar para a branch.
 
 ### Após concluir QUALQUER task
 
@@ -34,8 +35,10 @@ globs: ["src/**", "tests/**"]
 ### Fluxo visual
 
 ```
-PROGRESS.md → Verificar dependências → Branch → Implementar → DOD → PROGRESS.md (DONE)
+PROGRESS.md → Verificar dependências → Branch (git checkout -b) → Implementar → DOD → PROGRESS.md (DONE)
 ```
+
+**Regra crítica:** Nenhuma edição de arquivo (código, testes, config) pode acontecer antes de `git checkout -b <branch>`. A branch é o primeiro passo após marcar a task como IN_PROGRESS.
 
 ### Comandos de atualização
 
@@ -57,11 +60,12 @@ PROGRESS.md → Verificar dependências → Branch → Implementar → DOD → P
 
 **NUNCA codar diretamente na branch principal (main/master/develop).**
 
-### Antes de implementar QUALQUER task
+### Antes de implementar QUALQUER task (executar antes da primeira edição de código)
 
 1. Verificar branch: `git branch --show-current`
-2. Se estiver em main/master/develop: `git checkout -b feat/FEAT-xxx-descricao`
-3. Validar branch antes de commitar: `git status`
+2. Se estiver em main/master/develop: **criar e trocar para a branch da task** (nome em `docs/PROGRESS.md`, coluna Branch). Ex.: `git checkout -b feat/FEAT-001-user-model`
+3. Só então iniciar implementação (editar arquivos).
+4. Validar branch antes de commitar: `git status`
 
 ### Padrão de nomenclatura
 

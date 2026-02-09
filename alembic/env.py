@@ -10,8 +10,7 @@ from sqlmodel import SQLModel
 from alembic import context
 
 # Import all models here so Alembic can detect them
-# This will be populated as models are created
-# from src.models.user import User  # Uncomment when models are created
+from src.models import User  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
