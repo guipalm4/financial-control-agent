@@ -14,6 +14,10 @@ RUN uv sync --frozen --no-dev --no-install-project
 # Copy application code
 COPY src/ ./src/
 
+# Copy Alembic config and migrations (for make migrate inside container)
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
+
 # Use Python from uv's managed environment
 ENV PATH="/app/.venv/bin:$PATH"
 
