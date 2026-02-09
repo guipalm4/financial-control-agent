@@ -1,303 +1,275 @@
-# ADR — Telegram Finance Bot
+# ADR — Finance Bot Telegram
 
-> Architectural Decision Records — Decisões arquiteturais do projeto.
+> **Resumo executivo:** Registro das decisões arquiteturais do Finance Bot, incluindo escolha de stack, modelo de dados e estratégias de integração com APIs externas.
 
 ---
 
-## ADR-001: Usar APIs de IA na Nuvem (Groq + Gemini)
+## ADR-001: Stack Backend Python + FastAPI
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
 
-Precisamos de:
-1. Transcrição de áudio (Speech-to-Text)
-2. Extração de dados estruturados de texto natural (LLM)
+O projeto precisa de um backend para:
+- Servir webhooks do Telegram
+- Integrar com APIs de IA (Groq, Gemini)
+- Gerenciar dados no PostgreSQL
+- Processar áudio de forma assíncrona
 
 ### Decisão
 
-Usar **APIs de IA na nuvem** com providers especializados:
-- **Groq Whisper Large v3 Turbo** para transcrição (STT)
-- **Gemini 2.0 Flash** para extração de dados (LLM)
+Usar **Python 3.13+ com FastAPI 0.128.x** como framework web.
 
-### Alternativas Consideradas
+### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Groq Whisper + Gemini Flash** ✅ | Latência muito baixa, tiers free generosos, modelos especializados | Duas API keys, requer internet |
-| Groq para ambos (Whisper + Llama) | Uma única API key | Llama inferior ao Gemini para extração estruturada |
-| Whisper local | Offline, privacidade total | Requer GPU, mais lento |
-| OpenAI API | Alta qualidade | Mais caro, latência maior |
-| Ollama/Llama local | Offline, gratuito | Requer RAM/GPU, qualidade inferior |
+| **FastAPI** | Async nativo, validação Pydantic, docs automáticas, ecossistema IA | Curva de aprendizado para async |
+| Flask | Simples, maduro | Sync por padrão, sem validação nativa |
+| Node.js + Fastify | Muito rápido, bom para I/O | Menos bibliotecas de IA, tipagem opcional |
 
 ### Consequências
 
 **Ganhos:**
-- Latência muito baixa (~1-2s para áudio + extração)
-- Tiers free generosos (Groq: ~14K req/dia, Gemini: 15 RPM / 1M tokens/dia)
-- Sem necessidade de hardware especializado
-- Gemini Flash excelente para extração de JSON estruturado
+- Suporte nativo a async/await para I/O (Telegram, Groq, Gemini)
+- Validação automática com Pydantic
+- Documentação OpenAPI automática
+- Excelente integração com bibliotecas de IA Python
 
 **Perdas:**
-- Requer conexão com internet
-- Duas API keys para gerenciar
-- Dados passam por servidores externos (aceitável para uso pessoal)
+- Nenhuma significativa para este caso de uso
 
 **Riscos:**
-- Providers podem mudar política de preços (mitigação: monitorar uso)
+- Complexidade de async pode gerar bugs difíceis de debugar
 
 ---
 
-## ADR-002: SQLite como Banco de Dados
+## ADR-002: ORM SQLModel (SQLAlchemy + Pydantic)
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
 
-Precisamos persistir dados financeiros (gastos, cartões, faturas).
+Precisamos de um ORM para:
+- Definir modelos de dados
+- Validar dados de entrada/saída
+- Integrar com FastAPI de forma natural
 
 ### Decisão
 
-Usar **SQLite** com **SQLAlchemy 2.x**.
+Usar **SQLModel 0.0.24** como ORM, que combina SQLAlchemy com Pydantic.
 
-### Alternativas Consideradas
+### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **SQLite** ✅ | Zero config, arquivo único, backup fácil, ACID | Não escala horizontalmente |
-| PostgreSQL | Robusto, escala | Overkill para 1 usuário, requer setup |
-| JSON files | Simples | Sem queries, sem ACID |
+| **SQLModel** | Combina ORM + validação, mesma sintaxe do FastAPI | Relativamente novo (0.0.x) |
+| SQLAlchemy puro | Maduro, completo | Duplicação: modelos ORM + Pydantic separados |
+| Prisma (Python) | Tipagem forte, migrations | Menos maduro em Python |
 
 ### Consequências
 
 **Ganhos:**
-- Zero configuração
-- Backup = copiar um arquivo
-- Suficiente para milhares de registros
-- Portável (levar banco para outro PC)
+- Um único modelo para banco e validação
+- Integração perfeita com FastAPI
+- Menos código duplicado
 
 **Perdas:**
-- Não escala para múltiplos usuários (não aplicável)
+- Documentação menos extensa que SQLAlchemy puro
+
+**Riscos:**
+- Versão 0.0.x pode ter breaking changes (mitigado: fixar versão)
 
 ---
 
-## ADR-003: Confirmação Obrigatória Antes de Salvar
+## ADR-003: Biblioteca python-telegram-bot
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
 
-LLM pode extrair dados incorretos do áudio transcrito.
+Precisamos interagir com a API do Telegram para:
+- Receber mensagens e áudios
+- Enviar respostas com botões inline
+- Gerenciar estado de conversação
 
 ### Decisão
 
-Sempre mostrar **preview** e pedir **confirmação** antes de salvar.
+Usar **python-telegram-bot v22.5** como biblioteca oficial do Telegram.
 
-```
-[Áudio] → [Transcrição] → [Extração] → [PREVIEW] → [Confirmação] → [Salva]
-                                         ↑
-                                    Usuário valida
-```
-
-### Alternativas Consideradas
+### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Confirmação obrigatória** ✅ | Evita erros, transparência | Um clique extra |
-| Salvar direto | Mais rápido | Registros incorretos |
-| Confirmação opcional | Flexível | Inconsistência |
+| **python-telegram-bot** | Oficial, bem documentada, async nativo | API verbosa |
+| aiogram | Moderno, async first | Menos documentação |
+| Telegraf (Node.js) | Muito popular | Mudaria stack para Node.js |
 
 ### Consequências
 
 **Ganhos:**
-- Usuário sempre valida antes de salvar
-- Permite correção imediata
-- Maior confiança nos dados
+- Biblioteca oficial, mantida ativamente
+- Excelente documentação e exemplos
+- Suporte completo a todas as features do Telegram
 
 **Perdas:**
-- Um passo extra no fluxo
+- API pode ser verbosa para casos simples
+
+**Riscos:**
+- Nenhum significativo (biblioteca estável)
 
 ---
 
-## ADR-004: Classificação de Itens (ESSENCIAL vs NÃO ESSENCIAL)
+## ADR-004: Modelo de Dados Expense/Entry (Despesa/Lançamento)
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
 
-Usuário quer diferenciar gastos essenciais de não essenciais, inclusive dentro da mesma categoria (ex: carne vs cerveja, ambos no mercado).
+Despesas podem ser:
+- À vista (1 lançamento)
+- Parceladas (N lançamentos em faturas diferentes)
+- No débito (1 lançamento, data = compra)
+- No crédito (1+ lançamentos, data = vencimento fatura)
 
 ### Decisão
 
-- Categoria tem um **tipo padrão** (ESSENCIAL ou NÃO ESSENCIAL)
-- **Item específico** pode **sobrescrever** o tipo da categoria
-- LLM infere o tipo baseado no item mencionado
+Separar em duas entidades:
+- **Expense:** Registro da despesa original (valor total, descrição, categoria)
+- **Entry:** Lançamentos individuais (parcela, valor, data de vencimento, status)
 
-### Lógica
-
-```
-Mercado (categoria) → default ESSENCIAL
-  ├── carne → ESSENCIAL (mantém)
-  ├── arroz → ESSENCIAL (mantém)
-  ├── cerveja → NÃO ESSENCIAL (sobrescreve)
-  └── refrigerante → NÃO ESSENCIAL (sobrescreve)
-```
-
-### Alternativas Consideradas
+### Alternativas consideradas
 
 | Opção | Prós | Contras |
 |-------|------|---------|
-| **Item sobrescreve categoria** ✅ | Granular, preciso | LLM precisa inferir |
-| Apenas categoria | Simples | Impreciso (cerveja = essencial?) |
-| Subcategorias fixas | Estruturado | Muitas categorias |
+| **Expense + Entry** | Flexível, rastreia parcelas, calcula faturas | Mais complexo |
+| Apenas Expense | Simples | Não suporta parcelamento corretamente |
+| Expense com array de parcelas | Menos tabelas | Mais difícil consultar faturas |
 
 ### Consequências
 
 **Ganhos:**
-- Classificação precisa por item
-- Resumo financeiro mais útil (% essencial vs não essencial)
+- Consultas de fatura por mês são simples (WHERE due_date BETWEEN...)
+- Histórico de parcelas preservado
+- Status por parcela (pending, paid, cancelled)
 
 **Perdas:**
-- Depende da qualidade da extração do LLM
+- Mais JOINs em algumas consultas
+
+**Riscos:**
+- Nenhum significativo
 
 ---
 
-## ADR-005: Múltiplos Itens na Mesma Transcrição
+## ADR-005: Transcrição com Groq Whisper + Fallback
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
 
-Usuário pode dizer: "comprei 20 reais de cerveja e 15 de carne no mercado".
+Áudios precisam ser transcritos para texto antes da extração de entidades. Groq oferece Whisper com latência muito baixa.
 
 ### Decisão
 
-LLM retorna **array de itens** quando detecta múltiplos valores. Cada item vira um registro separado no banco.
+Usar **Groq Whisper** como serviço primário de transcrição, sem fallback no MVP (simplicidade).
 
-### Estrutura
+### Alternativas consideradas
 
-```json
-// Input: "20 de cerveja e 15 de carne"
-// Output:
-{
-  "items": [
-    {"amount": 20, "item": "cerveja", "category_type": "NAO_ESSENCIAL"},
-    {"amount": 15, "item": "carne", "category_type": "ESSENCIAL"}
-  ]
-}
-```
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **Groq Whisper** | Muito rápido (~1s), barato | Menos conhecido |
+| OpenAI Whisper | Original, mais recursos | Mais caro, mais lento |
+| Whisper local | Sem custo de API | Requer GPU, mais complexo |
 
 ### Consequências
 
 **Ganhos:**
-- Rastreabilidade por item
-- Classificação correta por item
-- Resumos mais precisos
+- Transcrição em ~1 segundo
+- Custo baixo
+- API simples
 
 **Perdas:**
-- Lógica de preview mais complexa (múltiplos itens)
+- Dependência de serviço externo
+
+**Riscos:**
+- Indisponibilidade do Groq (mitigado: retry + mensagem de erro amigável)
 
 ---
 
-## ADR-006: Detecção de Datas Relativas
+## ADR-006: Categorização com Gemini Flash + Aprendizado Local
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
 
-Usuário pode dizer: "gastei 50 reais ontem" ou "comprei na segunda-feira".
+Despesas precisam ser categorizadas. O sistema deve aprender padrões do usuário.
 
 ### Decisão
 
-LLM recebe a **data atual** no prompt e converte expressões relativas para datas absolutas.
+Estratégia híbrida:
+1. **Primeiro:** Buscar no histórico local (se descrição normalizada já foi categorizada 3+ vezes)
+2. **Se não encontrar:** Usar Gemini Flash para categorização por IA
 
-### Mapeamento
+### Alternativas consideradas
 
-| Expressão | Cálculo |
-|-----------|---------|
-| "hoje" | data atual |
-| "ontem" | data atual - 1 |
-| "anteontem" | data atual - 2 |
-| "segunda/terça/..." | último dia da semana |
-| (sem data) | data atual |
-
-### Prompt
-
-```
-Data de hoje: 2026-01-29
-Dia da semana: quarta-feira
-
-Regras de data:
-- "ontem" = 2026-01-28
-- "anteontem" = 2026-01-27
-- "segunda" = 2026-01-27 (última segunda)
-```
+| Opção | Prós | Contras |
+|-------|------|---------|
+| **Híbrido (local + LLM)** | Aprende, reduz custos, rápido para padrões | Mais complexo |
+| Só LLM | Simples | Custo maior, não aprende |
+| Só regras locais | Zero custo | Não generaliza |
 
 ### Consequências
 
 **Ganhos:**
-- Registro na data correta do gasto (não da transcrição)
-- Fatura calculada corretamente
+- Redução de chamadas à API ao longo do tempo
+- Categorização personalizada
+- Fallback para LLM em casos novos
 
 **Perdas:**
-- Depende da interpretação do LLM
+- Complexidade de implementação do cache de aprendizado
+
+**Riscos:**
+- Aprendizado incorreto se usuário errar categorização (mitigado: mínimo 3 confirmações)
 
 ---
 
-## ADR-007: Lógica de Parcelas por Fechamento
+## ADR-007: Armazenamento de Áudio Temporário
 
-**Status:** ✅ Aceito  
-**Data:** 2026-01-29  
-**Decisores:** Owner
+**Status:** Aceito  
+**Data:** 2026-02-03  
+**Decisores:** Desenvolvedor
 
 ### Contexto
 
-Compras parceladas no cartão precisam ser distribuídas nas faturas corretas.
+Áudios são recebidos do Telegram, processados e não são mais necessários após a transcrição.
 
 ### Decisão
 
-- **Parcela 1** entra na fatura atual (se compra ≤ fechamento) ou próxima (se compra > fechamento)
-- **Parcelas 2, 3, 4...** entram nos meses seguintes à parcela 1
-
-### Exemplo
-
-```
-Cartão: fecha dia 20, vence dia 28
-Compra: R$300 em 3x no dia 25/01 (> fechamento)
-
-Parcela 1 → FEV/2026 (R$100)
-Parcela 2 → MAR/2026 (R$100)
-Parcela 3 → ABR/2026 (R$100)
-```
+- Armazenar áudio localmente apenas durante processamento
+- Deletar após transcrição bem-sucedida
+- Cleanup job para áudios não processados após 7 dias (RULE-009)
 
 ### Consequências
 
 **Ganhos:**
-- Faturas refletem a realidade dos cartões
-- Alertas de vencimento precisos
+- Economia de espaço
+- Privacidade (dados não persistem)
+- Simplicidade
 
----
+**Perdas:**
+- Não é possível re-transcrever (precisa novo áudio)
 
-## Índice de ADRs
-
-| ID | Decisão | Status |
-|----|---------|--------|
-| ADR-001 | APIs de IA na nuvem (Groq + Gemini) | ✅ Aceito |
-| ADR-002 | SQLite como banco | ✅ Aceito |
-| ADR-003 | Confirmação obrigatória | ✅ Aceito |
-| ADR-004 | Item sobrescreve categoria | ✅ Aceito |
-| ADR-005 | Múltiplos itens por transcrição | ✅ Aceito |
-| ADR-006 | Datas relativas | ✅ Aceito |
-| ADR-007 | Parcelas por fechamento | ✅ Aceito |
+**Riscos:**
+- Perda de contexto em caso de erro (mitigado: log de erro com detalhes)
