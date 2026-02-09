@@ -122,7 +122,7 @@ async def validate_user(update: Update) -> User | None:
 | A03 | Injection | Sim | SQLModel (parameterized), validação Pydantic |
 | A04 | Insecure Design | Não | Design simples, single-user |
 | A05 | Security Misconfiguration | Sim | .env para segredos, Docker isolado |
-| A06 | Vulnerable Components | Parcial | Fixar versões no requirements.txt |
+| A06 | Vulnerable Components | Parcial | Fixar versões no pyproject.toml e uv.lock |
 | A07 | Auth Failures | Sim | Bloqueio após tentativas, sessão expira |
 | A08 | Software/Data Integrity | Não | Ambiente local, não há CI/CD |
 | A09 | Logging Failures | Sim | Não logar PIN, valores completos |
@@ -260,16 +260,22 @@ volumes:
 ```dockerfile
 FROM python:3.13-slim
 
+# Instalar uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # Não rodar como root
 RUN useradd -m -s /bin/bash app
 USER app
 
 WORKDIR /app
 
-COPY --chown=app:app requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=app:app pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY --chown=app:app src/ ./src/
+
+# Usar Python do ambiente gerenciado pelo uv
+ENV PATH="/app/.venv/bin:$PATH"
 
 CMD ["python", "-m", "src.main"]
 ```

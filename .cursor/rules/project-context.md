@@ -39,10 +39,11 @@ Bot Telegram para registro de despesas pessoais via áudio com transcrição aut
 
 ### Verificação de compatibilidade
 
-Antes de `pip install`:
+Antes de adicionar uma dependência (`uv add` ou `pip install`):
 1. Verificar se lib existe na tabela acima
 2. Se não existir, usar Context7 para verificar compatibilidade
 3. Adicionar à tabela após validação
+4. Usar `uv add <pacote>` para adicionar ao projeto (atualiza `pyproject.toml` e `uv.lock`)
 
 ## Estrutura de diretórios
 
@@ -68,7 +69,8 @@ finance-bot/
 │   └── integration/
 ├── docker-compose.yml
 ├── Dockerfile
-├── requirements.txt
+├── pyproject.toml
+├── uv.lock
 ├── .env.example
 └── README.md
 ```

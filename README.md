@@ -8,6 +8,7 @@ Bot Telegram para registro de despesas pessoais via áudio com transcrição aut
 
 - Docker e Docker Compose
 - Python 3.13+ (para desenvolvimento local)
+- [uv](https://github.com/astral-sh/uv) (gerenciador de pacotes Python)
 - Token do Telegram Bot (obtenha em [@BotFather](https://t.me/botfather))
 
 ### Configuração
@@ -36,7 +37,7 @@ docker compose logs -f bot
 
 ## 📁 Estrutura do Projeto
 
-```
+````
 finance-bot/
 ├── src/
 │   ├── api/             # Endpoints FastAPI (health, webhooks)
@@ -50,7 +51,8 @@ finance-bot/
 ├── tests/               # Testes
 ├── docker-compose.yml
 ├── Dockerfile
-└── requirements.txt
+├── pyproject.toml
+└── uv.lock
 ```
 
 ## 🛠️ Desenvolvimento
@@ -58,22 +60,30 @@ finance-bot/
 ### Executar localmente (sem Docker)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # No Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m src.main
+# Criar ambiente virtual e instalar dependências
+uv venv
+uv sync
+
+# Executar o bot
+uv run python -m src.main
 ```
+
+**Nota:** O projeto usa [uv](https://github.com/astral-sh/uv) como gerenciador de pacotes. As dependências estão definidas em `pyproject.toml` e o lockfile `uv.lock` garante builds reproduzíveis.
 
 ### Comandos úteis
 
 ```bash
-# Ver logs do bot
+# Usando Makefile (recomendado)
+make up          # Subir containers
+make down        # Parar containers
+make logs        # Ver logs do bot
+make test        # Executar testes
+make migrate     # Aplicar migrations
+make shell       # Abrir shell no container
+
+# Ou usando docker compose diretamente
 docker compose logs -f bot
-
-# Parar serviços
 docker compose down
-
-# Rebuild após mudanças
 docker compose up -d --build
 ```
 

@@ -94,17 +94,17 @@ bot  | INFO:src.bot.handlers.start:User 123456789 (@seu_usuario) sent /start
 
 ## 💻 Opção 2: Testar Localmente (Sem Docker)
 
-### Passo 1: Criar ambiente virtual
+### Passo 1: Criar ambiente virtual e instalar dependências
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate  # No Windows: .venv\Scripts\activate
+# Criar ambiente virtual e instalar dependências usando uv
+uv venv
+uv sync
 ```
 
-### Passo 2: Instalar dependências
-
+**Nota:** O projeto usa [uv](https://github.com/astral-sh/uv) como gerenciador de pacotes. Se você não tiver o uv instalado, instale com:
 ```bash
-pip install -r requirements.txt
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### Passo 3: Verificar se o PostgreSQL está rodando
@@ -120,7 +120,7 @@ docker compose up -d postgres
 
 ```bash
 # Certifique-se de que o .env está na raiz do projeto
-python -m src.main
+uv run python -m src.main
 ```
 
 Você deve ver:
