@@ -1,6 +1,7 @@
 ---
-description: Workflow de implementação — Git, DOD, Clarification, Progress Tracker, Métricas (95%+ precisão)
-alwaysApply: true
+description: Workflow de implementação — Git, DOD, Clarification, Progress Tracker, Métricas (95%+ precisão). Aplica ao editar código ou testes.
+alwaysApply: false
+globs: ["src/**", "tests/**"]
 ---
 
 # Workflow de Implementação — Finance Bot Telegram

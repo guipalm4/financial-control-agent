@@ -1,6 +1,6 @@
 ---
-description: Lições aprendidas, métricas e erros a evitar
-alwaysApply: true
+description: Lições aprendidas, métricas e erros a evitar. Consultar sob demanda (libs, padrões, métricas).
+alwaysApply: false
 ---
 
 # Learnings — Finance Bot Telegram
