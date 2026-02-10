@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str | None = None
     GOOGLE_API_KEY: str | None = None
 
+    # Audio / Transcription
+    AUDIO_MAX_DURATION_SECONDS: int = 60
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

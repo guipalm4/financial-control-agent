@@ -2,14 +2,9 @@
 
 import logging
 
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ConversationHandler,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import Application, CommandHandler, ConversationHandler, MessageHandler, filters
 
+from src.bot.handlers.audio import audio_message_handler
 from src.bot.handlers.cards import (
     CARD_CLOSING_DAY,
     CARD_DUE_DAY,
@@ -106,6 +101,9 @@ def create_app() -> Application:
     application.add_handler(CommandHandler("add_categoria", add_categoria_handler))
     application.add_handler(CommandHandler("list_categorias", list_categorias_handler))
     application.add_handler(CommandHandler("delete_categoria", delete_categoria_handler))
+
+    # FEAT-003: mensagens de voz → transcrição (AUDIO-001)
+    application.add_handler(MessageHandler(filters.VOICE & ~filters.COMMAND, audio_message_handler))
 
     return application
 
