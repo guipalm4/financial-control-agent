@@ -194,7 +194,13 @@ async def test_add_cartao_full_flow_saves_card() -> None:
 
     # Check DB
     with Session(test_engine) as session:
-        stmt = select(Card).where(Card.user_id == user_id).where(Card.deleted_at.is_(None))
+        stmt = (
+            select(Card)
+            .where(Card.user_id == user_id)
+            .where(
+                Card.deleted_at.is_(None)  # type: ignore[union-attr]
+            )
+        )
         cards = list(session.exec(stmt).all())
     assert len(cards) == 1
     assert cards[0].name == "Nubank"

@@ -1,4 +1,7 @@
-"""Unit tests for category CRUD handlers (FEAT-011): add_categoria, list_categorias, delete_categoria."""
+"""Unit tests for category CRUD handlers (FEAT-011).
+
+Includes add_categoria, list_categorias and delete_categoria handlers.
+"""
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -57,9 +60,7 @@ async def test_add_categoria_creates_custom_category() -> None:
 
     update = MagicMock()
     update.effective_user = MagicMock(id=55555)
-    update.message = MagicMock(
-        text="/add_categoria Mercado", reply_text=AsyncMock()
-    )
+    update.message = MagicMock(text="/add_categoria Mercado", reply_text=AsyncMock())
     context = MagicMock()
 
     with (
@@ -154,9 +155,7 @@ async def test_delete_categoria_cannot_delete_default() -> None:
 
         seed_default_categories(session, user_id)
         stmt = (
-            select(Category)
-            .where(Category.user_id == user_id)
-            .where(Category.is_default == True)  # noqa: E712
+            select(Category).where(Category.user_id == user_id).where(Category.is_default == True)  # noqa: E712
         )
         default_category = session.exec(stmt).first()
         assert default_category is not None
@@ -165,9 +164,7 @@ async def test_delete_categoria_cannot_delete_default() -> None:
 
     update = MagicMock()
     update.effective_user = MagicMock(id=88888)
-    update.message = MagicMock(
-        text=f"/delete_categoria {default_id}", reply_text=AsyncMock()
-    )
+    update.message = MagicMock(text=f"/delete_categoria {default_id}", reply_text=AsyncMock())
     context = MagicMock()
 
     with (
@@ -202,18 +199,16 @@ async def test_delete_categoria_soft_deletes_custom() -> None:
         user_id = user.id
         assert user_id is not None
 
-        category = Category(user_id=user_id, name="Uber", is_default=False)
-        session.add(category)
+        created_category = Category(user_id=user_id, name="Uber", is_default=False)
+        session.add(created_category)
         session.commit()
-        session.refresh(category)
-        category_id = category.id
+        session.refresh(created_category)
+        category_id = created_category.id
         assert category_id is not None
 
     update = MagicMock()
     update.effective_user = MagicMock(id=99999)
-    update.message = MagicMock(
-        text=f"/delete_categoria {category_id}", reply_text=AsyncMock()
-    )
+    update.message = MagicMock(text=f"/delete_categoria {category_id}", reply_text=AsyncMock())
     context = MagicMock()
 
     with (
@@ -231,4 +226,3 @@ async def test_delete_categoria_soft_deletes_custom() -> None:
         category = session.exec(stmt).first()
         assert category is not None
         assert category.deleted_at is not None
-

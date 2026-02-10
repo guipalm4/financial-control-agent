@@ -1,4 +1,4 @@
-""""Handlers for category CRUD: /add_categoria, /list_categorias, /delete_categoria (FEAT-011)."""
+""" "Handlers for category CRUD: /add_categoria, /list_categorias, /delete_categoria (FEAT-011)."""
 
 import logging
 from datetime import UTC, datetime
@@ -83,7 +83,7 @@ async def list_categorias_handler(update: Update, context: ContextTypes.DEFAULT_
             select(Category)
             .where(Category.user_id == db_user.id)
             .where(Category.deleted_at == None)  # noqa: E711
-            .order_by(Category.is_default.desc(), Category.name)
+            .order_by(Category.is_default.desc(), Category.name)  # type: ignore[attr-defined]
         )
         categories = list(session.exec(stmt).all())
 
@@ -119,8 +119,7 @@ async def delete_categoria_handler(update: Update, context: ContextTypes.DEFAULT
     parts = text.split()
     if len(parts) < 2:
         await message.reply_text(
-            "Uso: /delete_categoria <id>\n"
-            "Use /list_categorias para ver os IDs das suas categorias."
+            "Uso: /delete_categoria <id>\nUse /list_categorias para ver os IDs das suas categorias."
         )
         return
 
@@ -146,8 +145,7 @@ async def delete_categoria_handler(update: Update, context: ContextTypes.DEFAULT
 
         if category.is_default:
             await message.reply_text(
-                "❌ Não é possível excluir categorias padrão.\n"
-                "code: CATEGORY.CANNOT_DELETE_DEFAULT"
+                "❌ Não é possível excluir categorias padrão.\ncode: CATEGORY.CANNOT_DELETE_DEFAULT"
             )
             return
 
@@ -157,4 +155,3 @@ async def delete_categoria_handler(update: Update, context: ContextTypes.DEFAULT
         session.commit()
 
     await message.reply_text(f'✅ Categoria "{category_name}" removida.')
-

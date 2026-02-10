@@ -21,6 +21,23 @@ def is_valid_pin(pin: str) -> bool:
     return pin.isdigit() and 4 <= len(pin) <= 6
 
 
+def build_onboarding_message(first_name: str | None) -> str:
+    """Build onboarding message after successful PIN creation.
+
+    Guides the user to configure cards and categories using existing commands,
+    while making clear that onboarding can be skipped for later.
+    """
+    greeting_name = f" {first_name}" if first_name else ""
+    return (
+        f"✅ PIN criado{greeting_name}! Vamos configurar seus cartões.\n\n"
+        "1️⃣ Para cadastrar seu primeiro cartão, use o comando /add_cartao e siga as instruções.\n"
+        "2️⃣ Para ver os cartões já cadastrados, use /list_cartoes.\n"
+        "3️⃣ Para criar novas categorias, use /add_categoria.\n\n"
+        "Se preferir, você pode pular esta etapa por enquanto e cadastrar seus cartões "
+        "mais tarde usando esses mesmos comandos."
+    )
+
+
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Entry point for /start.
 
@@ -109,8 +126,8 @@ async def confirm_pin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
                 seed_default_categories(session, new_user.id)
 
     user_data.pop("pending_pin", None)
-    await message.reply_text("✅ PIN criado! Vamos configurar seus cartões.")
-    # Onboarding wizard will be implemented in ONBOARD-004
+    onboarding_text = build_onboarding_message(user.first_name)
+    await message.reply_text(onboarding_text)
     return ConversationHandler.END
 
 
