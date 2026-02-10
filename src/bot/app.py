@@ -24,6 +24,11 @@ from src.bot.handlers.cards import (
     delete_cartao_handler,
     list_cartoes_handler,
 )
+from src.bot.handlers.categories import (
+    add_categoria_handler,
+    delete_categoria_handler,
+    list_categorias_handler,
+)
 from src.bot.handlers.login import (
     ASK_LOGIN_PIN,
     login_ask_pin,
@@ -96,6 +101,11 @@ def create_app() -> Application:
     application.add_handler(add_cartao_conv)
     application.add_handler(CommandHandler("list_cartoes", list_cartoes_handler))
     application.add_handler(CommandHandler("delete_cartao", delete_cartao_handler))
+
+    # FEAT-011: CRUD categorias
+    application.add_handler(CommandHandler("add_categoria", add_categoria_handler))
+    application.add_handler(CommandHandler("list_categorias", list_categorias_handler))
+    application.add_handler(CommandHandler("delete_categoria", delete_categoria_handler))
 
     return application
 

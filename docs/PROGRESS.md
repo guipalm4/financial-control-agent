@@ -175,7 +175,7 @@ graph TD
 |----|------|--------|--------|-------------|-----|
 | ONBOARD-001 | Modelos Card e Category + migrations + seed categorias padrão | ✅ | `feat/FEAT-002-models` | AUTH-001 | [x] |
 | ONBOARD-002 | CRUD completo de cartões: /add_cartao, /list_cartoes, /delete_cartao + validações (RULE-001) | ✅ | `feat/FEAT-010-crud-cartoes` | ONBOARD-001 | [x] |
-| ONBOARD-003 | CRUD de categorias: /add_categoria, /list_categorias, /delete_categoria | ⏳ | `feat/FEAT-011-crud-categorias` | ONBOARD-001 | [ ] |
+| ONBOARD-003 | CRUD de categorias: /add_categoria, /list_categorias, /delete_categoria | ✅ | `feat/FEAT-011-crud-categorias` | ONBOARD-001 | [x] |
 | ONBOARD-004 | Wizard de onboarding pós-PIN (guia cadastro cartão) | ⏳ | `feat/FEAT-002-wizard` | ONBOARD-002, AUTH-002 | [ ] |
 
 **Detalhamento ONBOARD-001:**
@@ -525,13 +525,13 @@ graph TD
 |--------|-------------|------|----------|
 | Sprint 0: Infra | 3 | 3 | 100% |
 | Sprint 1: Auth | 3 | 3 | 100% |
-| Sprint 2: Onboarding | 4 | 2 | 50% |
+| Sprint 2: Onboarding | 4 | 3 | 75% |
 | Sprint 3: Core Audio | 4 | 0 | 0% |
 | Sprint 4: Categorização | 3 | 0 | 0% |
 | Sprint 5: Financeiro | 3 | 0 | 0% |
 | Sprint 6: Relatórios | 3 | 0 | 0% |
 | Sprint 7: Observabilidade | 3 | 0 | 0% |
-| **TOTAL** | **26** | **8** | **31%** |
+| **TOTAL** | **26** | **9** | **35%** |
 
 ### Por Prioridade de Testes
 
@@ -548,6 +548,8 @@ graph TD
 
 | Data | Sprint | Task | De | Para | Notas |
 |------|--------|------|----|------|-------|
+| 2026-02-10 | Sprint 2: Onboarding | ONBOARD-003 | 🔄 | ✅ | DOD completo |
+| 2026-02-10 | Sprint 2: Onboarding | ONBOARD-003 | ⏳ | 🔄 | Iniciando: CRUD de categorias (/add_categoria, /list_categorias, /delete_categoria) |
 | 2026-02-09 | Sprint 2: Onboarding | ONBOARD-002 | 🔄 | ✅ | DOD completo |
 | 2026-02-09 | Sprint 2: Onboarding | ONBOARD-002 | ⏳ | 🔄 | Iniciando: CRUD cartões + validações RULE-001 |
 | 2026-02-09 | Sprint 2: Onboarding | ONBOARD-001 | 🔄 | ✅ | DOD completo |
