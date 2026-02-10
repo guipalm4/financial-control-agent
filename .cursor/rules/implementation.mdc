@@ -111,9 +111,8 @@ Uma task SÓ pode ser marcada como DONE quando TODOS os itens forem verificados.
 ### DOD Básico (todas as tasks)
 
 - [ ] Código compila sem erros
-- [ ] Lint passa sem erros críticos (`ruff check .`)
-- [ ] Formatação aplicada (`ruff format .`)
-- [ ] Tipos verificados (`mypy .`)
+- [ ] Lint + formatação passam sem erros críticos (`make lint` → `uv run ruff check .` + `uv run ruff format . --check`)
+- [ ] Tipos verificados (`make typecheck` → `uv run mypy .`)
 
 ### DOD Funcional (features)
 
@@ -138,8 +137,8 @@ Uma task SÓ pode ser marcada como DONE quando TODOS os itens forem verificados.
 
 ```bash
 git branch --show-current   # NÃO deve ser main
-ruff check . && ruff format . --check && mypy .
-pytest tests/ -v
+make lint && make typecheck
+make test
 docker compose up -d && docker compose logs
 ```
 
