@@ -10,6 +10,20 @@ from telegram.ext import (
     filters,
 )
 
+from src.bot.handlers.cards import (
+    CARD_CLOSING_DAY,
+    CARD_DUE_DAY,
+    CARD_LAST_DIGITS,
+    CARD_NAME,
+    add_cartao_cancel,
+    add_cartao_closing_day,
+    add_cartao_due_day,
+    add_cartao_last_digits,
+    add_cartao_name,
+    add_cartao_start,
+    delete_cartao_handler,
+    list_cartoes_handler,
+)
 from src.bot.handlers.login import (
     ASK_LOGIN_PIN,
     login_ask_pin,
@@ -61,6 +75,27 @@ def create_app() -> Application:
         ],
     )
     application.add_handler(login_conv)
+
+    # FEAT-010: CRUD cartões
+    add_cartao_conv = ConversationHandler(
+        entry_points=[CommandHandler("add_cartao", add_cartao_start)],
+        states={
+            CARD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_cartao_name)],
+            CARD_LAST_DIGITS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, add_cartao_last_digits),
+            ],
+            CARD_CLOSING_DAY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, add_cartao_closing_day),
+            ],
+            CARD_DUE_DAY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, add_cartao_due_day),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", add_cartao_cancel)],
+    )
+    application.add_handler(add_cartao_conv)
+    application.add_handler(CommandHandler("list_cartoes", list_cartoes_handler))
+    application.add_handler(CommandHandler("delete_cartao", delete_cartao_handler))
 
     return application
 
