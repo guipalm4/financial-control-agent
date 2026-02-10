@@ -174,7 +174,7 @@ graph TD
 | ID | Task | Status | Branch | Dependência | DOD |
 |----|------|--------|--------|-------------|-----|
 | ONBOARD-001 | Modelos Card e Category + migrations + seed categorias padrão | ✅ | `feat/FEAT-002-models` | AUTH-001 | [x] |
-| ONBOARD-002 | CRUD completo de cartões: /add_cartao, /list_cartoes, /delete_cartao + validações (RULE-001) | ⏳ | `feat/FEAT-010-crud-cartoes` | ONBOARD-001 | [ ] |
+| ONBOARD-002 | CRUD completo de cartões: /add_cartao, /list_cartoes, /delete_cartao + validações (RULE-001) | ✅ | `feat/FEAT-010-crud-cartoes` | ONBOARD-001 | [x] |
 | ONBOARD-003 | CRUD de categorias: /add_categoria, /list_categorias, /delete_categoria | ⏳ | `feat/FEAT-011-crud-categorias` | ONBOARD-001 | [ ] |
 | ONBOARD-004 | Wizard de onboarding pós-PIN (guia cadastro cartão) | ⏳ | `feat/FEAT-002-wizard` | ONBOARD-002, AUTH-002 | [ ] |
 
@@ -205,9 +205,9 @@ graph TD
 
 | TEST ID | Cenário | Prioridade | Status | Implementado em |
 |---------|---------|------------|--------|-----------------|
-| TEST-010 | Cadastro de cartão válido | P0 | ⏳ | ONBOARD-002 |
-| TEST-011 | Cartão com dígitos inválidos | P1 | ⏳ | ONBOARD-002 |
-| TEST-012 | Dia de fechamento inválido | P1 | ⏳ | ONBOARD-002 |
+| TEST-010 | Cadastro de cartão válido | P0 | ✅ | ONBOARD-002 |
+| TEST-011 | Cartão com dígitos inválidos | P1 | ✅ | ONBOARD-002 |
+| TEST-012 | Dia de fechamento inválido | P1 | ✅ | ONBOARD-002 |
 
 ### Critérios de Saída Sprint 2
 
@@ -525,22 +525,22 @@ graph TD
 |--------|-------------|------|----------|
 | Sprint 0: Infra | 3 | 3 | 100% |
 | Sprint 1: Auth | 3 | 3 | 100% |
-| Sprint 2: Onboarding | 4 | 1 | 25% |
+| Sprint 2: Onboarding | 4 | 2 | 50% |
 | Sprint 3: Core Audio | 4 | 0 | 0% |
 | Sprint 4: Categorização | 3 | 0 | 0% |
 | Sprint 5: Financeiro | 3 | 0 | 0% |
 | Sprint 6: Relatórios | 3 | 0 | 0% |
 | Sprint 7: Observabilidade | 3 | 0 | 0% |
-| **TOTAL** | **26** | **7** | **27%** |
+| **TOTAL** | **26** | **8** | **31%** |
 
 ### Por Prioridade de Testes
 
 | Prioridade | Total | Done | Restante |
 |------------|-------|------|----------|
-| P0 (Crítico) | 12 | 0 | 12 |
-| P1 (Importante) | 13 | 0 | 13 |
+| P0 (Crítico) | 12 | 1 | 11 |
+| P1 (Importante) | 13 | 2 | 11 |
 | P2 (Nice to have) | 2 | 0 | 2 |
-| **TOTAL** | **27** | **0** | **27** |
+| **TOTAL** | **27** | **3** | **24** |
 
 ---
 
@@ -548,6 +548,8 @@ graph TD
 
 | Data | Sprint | Task | De | Para | Notas |
 |------|--------|------|----|------|-------|
+| 2026-02-09 | Sprint 2: Onboarding | ONBOARD-002 | 🔄 | ✅ | DOD completo |
+| 2026-02-09 | Sprint 2: Onboarding | ONBOARD-002 | ⏳ | 🔄 | Iniciando: CRUD cartões + validações RULE-001 |
 | 2026-02-09 | Sprint 2: Onboarding | ONBOARD-001 | 🔄 | ✅ | DOD completo |
 | 2026-02-09 | Sprint 2: Onboarding | ONBOARD-001 | ⏳ | 🔄 | Iniciando: Modelos Card e Category + migrations + seed categorias padrão |
 | 2026-02-09 | Sprint 1: Autenticação | AUTH-003 | 🔄 | ✅ | DOD completo |
