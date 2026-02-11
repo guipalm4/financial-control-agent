@@ -37,7 +37,9 @@ async def test_transcribe_audio_raises_on_exception(tmp_path: Path) -> None:
     audio_path = tmp_path / "audio.ogg"
     audio_path.write_bytes(b"dummy")
 
-    async_mock = AsyncMock(side_effect=groq.APIError(message="boom", request=None, body=None))
+    async_mock = AsyncMock(
+        side_effect=groq.APIError(message="boom", request=MagicMock(), body=None)
+    )
     fake_client = MagicMock()
     fake_client.audio.transcriptions.create = async_mock
 

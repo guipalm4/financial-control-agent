@@ -75,7 +75,7 @@ async def test_extract_expense_handles_not_detected_error() -> None:
     transcription = "Oi, como você está?"
 
     mock_response = MagicMock()
-    mock_response.parsed = ExtractionResponse(error="NOT_DETECTED")
+    mock_response.parsed = ExtractionResponse.model_validate({"error": "NOT_DETECTED"})
 
     mock_client = MagicMock()
     mock_client.aio = MagicMock()
