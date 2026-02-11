@@ -234,7 +234,7 @@ graph TD
 | ID | Task | Status | Branch | Dependência | DOD |
 |----|------|--------|--------|-------------|-----|
 | AUDIO-001 | Service Groq Whisper: transcrição de áudio + handler mensagem áudio + validação (max 60s) | ✅ | `feat/FEAT-003-groq-transcription` | INFRA-001 | [x] |
-| AUDIO-002 | Service Gemini Flash: extração de entidades (valor, descrição, data, categoria) + prompt engineering + parser JSON | ⏳ | `feat/FEAT-003-gemini-extraction` | INFRA-001 | [ ] |
+| AUDIO-002 | Service Gemini Flash: extração de entidades (valor, descrição, data, categoria) + prompt engineering + parser JSON | ✅ | `feat/FEAT-003-gemini-extraction` | INFRA-001 | [x] |
 | AUDIO-003 | Interpretação de datas relativas ("ontem", "sábado passado") + validação data não futura + detecção múltiplas despesas | ⏳ | `feat/FEAT-005-date-parsing` | AUDIO-002 | [ ] |
 | AUDIO-004 | Fluxo completo: áudio → transcrição → extração → interpretação datas → resumo para confirmação | ⏳ | `feat/FEAT-003-audio-flow` | AUDIO-001, AUDIO-002, AUDIO-003 | [ ] |
 
@@ -526,12 +526,12 @@ graph TD
 | Sprint 0: Infra | 3 | 3 | 100% |
 | Sprint 1: Auth | 3 | 3 | 100% |
 | Sprint 2: Onboarding | 4 | 4 | 100% |
-| Sprint 3: Core Audio | 4 | 1 | 25% |
+| Sprint 3: Core Audio | 4 | 2 | 50% |
 | Sprint 4: Categorização | 3 | 0 | 0% |
 | Sprint 5: Financeiro | 3 | 0 | 0% |
 | Sprint 6: Relatórios | 3 | 0 | 0% |
 | Sprint 7: Observabilidade | 3 | 0 | 0% |
-| **TOTAL** | **26** | **11** | **42%** |
+| **TOTAL** | **26** | **12** | **46%** |
 
 ### Por Prioridade de Testes
 
@@ -548,6 +548,8 @@ graph TD
 
 | Data | Sprint | Task | De | Para | Notas |
 |------|--------|------|----|------|-------|
+| 2026-02-10 | Sprint 3: Core Audio | AUDIO-002 | 🔄 | ✅ | DOD completo |
+| 2026-02-10 | Sprint 3: Core Audio | AUDIO-002 | ⏳ | 🔄 | Iniciando: Service Gemini Flash para extração de entidades |
 | 2026-02-10 | Sprint 3: Core Audio | AUDIO-001 | 🔄 | ✅ | DOD completo |
 | 2026-02-10 | Sprint 3: Core Audio | AUDIO-001 | ⏳ | 🔄 | Iniciando: Service Groq Whisper + handler áudio |
 | 2026-02-10 | Sprint 2: Onboarding | ONBOARD-004 | 🔄 | ✅ | DOD completo |
